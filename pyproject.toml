@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hermes-echotik-agent"
+version = "0.1.0"
+description = "Python sidecar: SQLite + LanceDB RAG + campaign rules for EchoTok Hub (ADR-001 external agent)."
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.34,<1",
+  "pydantic>=2.11,<3",
+  "httpx>=0.28,<1",
+  "python-multipart>=0.0.9",
+  "lancedb>=0.21,<1",
+  "pyarrow>=18,<22",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/echotik_agent"]
+

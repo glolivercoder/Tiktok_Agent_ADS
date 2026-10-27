@@ -1,0 +1,44 @@
+# Ambiente / segredos
+.env
+.env.*
+!.env.example
+*.env
+secrets.*
+*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+config.local.*
+local.settings.json
+
+# Dados locais / RAG / SQLite
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+lancedb/
+*.lance
+
+# Python / build
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
