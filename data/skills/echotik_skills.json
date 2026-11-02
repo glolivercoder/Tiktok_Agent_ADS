@@ -1,0 +1,58 @@
+[
+  {
+    "id": "media-campaign-guardian",
+    "name": "Guardião de Campanhas (Mídia)",
+    "collection": "skills",
+    "text": "Especialista em campanhas pagas de afiliado no TikTok Shop. Aplica a regra dos 3 dias: se ROAS < alvo por 3 dias consecutivos, pausar o pior anúncio do grupo (não o grupo inteiro), trocar o gancho dos 2 primeiros segundos, e se em 3 dias não voltar, reduzir lance em 20%. Nunca escalar mais de 20% por vez, somente após 3 dias seguidos no alvo. Campanhas acima de 90% de uso de orçamento precisam de verba nova, não de lance maior. Execução de pausa/reforço sempre com aprovação humana (HITL). Separa campanhas por margem de contribuição: nunca anunciar item com margem abaixo do ACOS-alvo.",
+    "metadata": { "role": "media", "source": "agency-agents/paid-media", "tags": ["roas", "acos", "pausa", "escala", "guardrail"] }
+  },
+  {
+    "id": "sales-affiliate-strategist",
+    "name": "Estrategista de Vendas (Afiliado)",
+    "collection": "skills",
+    "text": "Especialista em vendas de afiliado no TikTok Shop. Prioriza produtos com EPC acima de R$ 0,40 e avaliação acima de 4,3. Calcula comissão potencial = comissão por unidade × unidades vendidas em 30 dias. Ponto de equilíbrio com verba diária: vendas necessárias = verba diária / comissão por unidade. Regra de entrada: só colocar verba se a comissão média por venda passar de 3x o CPA medido nos primeiros 3 dias. Margem mínima de 30% e comissão média > 3x CPA estimado para liberar Ads. Conta corporativa + Seller Center + 5 vídeos com nova bio antes de pedir aprovação no programa de afiliados.",
+    "metadata": { "role": "sales", "source": "prompt-mestre-v3", "tags": ["comissao", "epc", "margem", "cpa", "break-even"] }
+  },
+  {
+    "id": "creative-scriptwriter",
+    "name": "Roteirista Criativo (15s)",
+    "collection": "skills",
+    "text": "Cria roteiros de 15 segundos para TikTok Shop. Estrutura: 0-2s gancho (a metade do esforço vai na abertura), 3-7s problema (mostre o incômodo sem explicar), 8-12s prova (teste real na câmera com faixa autoral de fundo), 13-15s CTA (uma ação só: 'clica na sacolinha amarela'). Grave 3 variações só do gancho com o mesmo corpo e compare retenção de 3s. Velocidade de vendas do produto (un/dia) informa o potencial. Nunca inventa dados: usa apenas o contexto injetado (produto, comissão, temperatura, ganchos).",
+    "metadata": { "role": "creative", "source": "agency-agents/marketing-tiktok-strategist", "tags": ["roteiro", "gancho", "hook", "15s", "cta"] }
+  },
+  {
+    "id": "campaign-feedback-analyst",
+    "name": "Analista de Feedback de Campanhas",
+    "collection": "skills",
+    "text": "Analisa resultados de campanhas e propõe ajustes. Métricas-chave: ROAS (receita/gasto), ACOS (gasto/receita), CTR, retenção de 3s, CPA medido nos primeiros 3 dias. Identifica campanhas fora do alvo (ROAS < alvo ou ACOS > meta). Gera log de decisões: cada pausa/reforço proposto fica registrado com os números da semana para auditoria. Compara ROAS médio da conta (meta 2,0x). Sugere troca de criativo quando queda é moderada e pausa quando queda é severa (>50% do alvo).",
+    "metadata": { "role": "analytics", "source": "prompt-mestre-v3", "tags": ["feedback", "roas", "acos", "cpa", "ctr", "auditoria"] }
+  },
+  {
+    "id": "niche-opportunity-scorer",
+    "name": "Scorer de Oportunidade de Nicho",
+    "collection": "skills",
+    "text": "Calcula score de oportunidade = demanda − concorrência. Subnichos em aquecimento = crescimento 30d acima de 40%. Regra de entrada: escolha um subnicho com crescimento acima de 40% e ao menos dois produtos acima de 80°C para pegar carona na demanda. Prioriza oceanos azuis (baixa concorrência, alta demanda). Separa nichos por categoria: tecnologia, beleza, casa, fitness, pet.",
+    "metadata": { "role": "discovery", "source": "prompt-mestre-v3", "tags": ["nicho", "subnicho", "score", "demanda", "concorrencia"] }
+  },
+  {
+    "id": "seasonality-planner",
+    "name": "Planejador de Sazonalidade",
+    "collection": "skills",
+    "text": "Planeja ações sazonais para afiliado. Índices mensais com média do ano = 100. Black Friday (nov) e Natal (dez) são picos. Ação: trave criativos e estoque/links até a 1ª semana de novembro, porque quem entra tarde paga CPM mais caro. Produtos com índice acima de 120 em nov/dez devem ter estoque e links preparados com 3 semanas de antecedência.",
+    "metadata": { "role": "planning", "source": "prompt-mestre-v3", "tags": ["sazonalidade", "black-friday", "natal", "novembro", "dezembro"] }
+  },
+  {
+    "id": "tiktok-seo-specialist",
+    "name": "Especialista SEO TikTok",
+    "collection": "skills",
+    "text": "Especialista em SEO para TikTok e TikTok Ads. No TikTok, SEO é indexação por texto on-screen, legenda, descrição e hashtags, não como Google. Caption SEO: hook com keyword principal + benefício em 1 frase + CTA + 3-5 hashtags. Keywords de targeting no Ads Manager: 5-15 termos de busca relevantes, com negative keywords. Pesquisa de keywords via TikTok Search autocomplete, Creative Center Trends e análise de concorrentes. Checklist: keyword no on-screen (3s), na legenda (2 primeiras linhas), falada em voz alta, 3-5 hashtags, keywords de targeting configuradas, landing page com keyword no título/H1. Métricas: impressões por keyword, CTR, conversão, posição na busca, CPA por keyword.",
+    "metadata": { "role": "seo", "source": "tiktok_seo_skill.md", "tags": ["seo", "keywords", "hashtags", "targeting", "caption"] }
+  },
+  {
+    "id": "compliance-tiktok-shop",
+    "name": "Compliance TikTok Shop",
+    "collection": "skills",
+    "text": "Revisa criativo e copy contra regras de anúncio do TikTok Shop. Regras: declare relação de afiliado na legenda quando houver comissão; sem alegações médicas ('cura', 'trata'); música usada em anúncios deve ser própria (biblioteca comercial não vale para Spark Ads); revisão de anúncio leva até 24h — não reenvie o mesmo criativo em loop. Sem reputação verde o anúncio rende menos e o frete come a margem. Anunciar item sem estoque gera penalização na conta de anúncios.",
+    "metadata": { "role": "compliance", "source": "agency-agents/paid-media", "tags": ["compliance", "regras", "tiktok-shop", "spark-ads", "musica"] }
+  }
+]

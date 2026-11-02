@@ -15,7 +15,7 @@ config.local.*
 local.settings.json
 
 # Dados locais / RAG / SQLite
-data/
+data/*
 !data/skills/
 !data/skills/**
 *.db
