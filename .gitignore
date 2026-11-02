@@ -16,6 +16,8 @@ local.settings.json
 
 # Dados locais / RAG / SQLite
 data/
+!data/skills/
+!data/skills/**
 *.db
 *.db-wal
 *.db-shm
