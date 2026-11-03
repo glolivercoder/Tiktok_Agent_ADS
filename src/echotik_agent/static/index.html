@@ -2210,10 +2210,21 @@ RENDER.dados = function renderDados() {
   calcUpdate();
 };
 
-function calcUpdate() {
+async function calcUpdate() {
   const chamadas = Math.max(0, +$('#calcChamadas').value || 0);
   const preco = Math.max(0, +$('#calcPreco').value || 0);
-  $('#calcResultado').textContent = fmtBRL2(chamadas * 30 / 1000 * preco);
+  try {
+    const r = await sidecarFetch('/custo/echotok?chamadas_dia=' + chamadas + '&preco_por_mil=' + preco, { method: 'GET' }, 8000);
+    const j = await r.json().catch(() => null);
+    if (r.ok && j) {
+      $('#calcResultado').textContent = 'R$ ' + j.custo_mes_brl.toFixed(2).replace('.', ',');
+      $('#calcResultado').title = 'Custo/dia: R$ ' + j.custo_dia_brl.toFixed(2) + ' · Cota: ' + j.usado_hoje + '/' + j.cota_diaria;
+    } else {
+      $('#calcResultado').textContent = fmtBRL2(chamadas * 30 / 1000 * preco);
+    }
+  } catch (e) {
+    $('#calcResultado').textContent = fmtBRL2(chamadas * 30 / 1000 * preco);
+  }
 }
 
 /* ---------- diálogo de nova campanha ---------- */
@@ -2785,13 +2796,38 @@ function setCalcModel() {
     ? 'Modelo com camada gr\u00E1tis: gasto zero dentro do limite di\u00E1rio; os pre\u00E7os ao lado valem para a variante paga.'
     : (m.nota || '');
 }
-function cfgCalcUpdate() {
+async function cfgCalcUpdate() {
   const c = state.config.calc;
   c.in = Math.max(0, +$('#cfgIn').value || 0);
   c.out = Math.max(0, +$('#cfgOut').value || 0);
   c.pin = Math.max(0, +$('#cfgPin').value || 0);
   c.pout = Math.max(0, +$('#cfgPout').value || 0);
   c.fx = Math.max(0, +$('#cfgFx').value || 0);
+
+  if (sidecarReady()) {
+    try {
+      const r = await sidecarFetch(
+        '/custo/llm?provedor=' + encodeURIComponent(c.p) +
+        '&modelo=' + encodeURIComponent(c.m) +
+        '&tokens_entrada_dia=' + c.in +
+        '&tokens_saida_dia=' + c.out +
+        '&preco_entrada_1m=' + c.pin +
+        '&preco_saida_1m=' + c.pout +
+        '&cambio=' + c.fx,
+        { method: 'GET' }, 8000
+      );
+      const j = await r.json().catch(() => null);
+      if (r.ok && j) {
+        $('#cfgCalcDia').textContent = 'US$ ' + j.custo_dia_usd.toFixed(4) + ' \u00B7 R$ ' + j.custo_dia_brl.toFixed(2);
+        $('#cfgCalcMes').textContent = 'US$ ' + j.custo_mes_usd.toFixed(4) + ' \u00B7 R$ ' + j.custo_mes_brl.toFixed(2);
+        persist();
+        return;
+      }
+    } catch (e) {
+      // fallback para cálculo local
+    }
+  }
+
   const dia = (c.in * c.pin + c.out * c.pout) / 1e6;
   $('#cfgCalcDia').textContent = 'US$ ' + nfX.format(dia) + ' \u00B7 R$ ' + nfX.format(dia * c.fx);
   $('#cfgCalcMes').textContent = 'US$ ' + nfX.format(dia * 30) + ' \u00B7 R$ ' + nfX.format(dia * 30 * c.fx);

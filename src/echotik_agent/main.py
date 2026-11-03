@@ -601,6 +601,108 @@ def create_app(
         n = rg.seed_personas(Path(directory), body.globs)
         return {"ok": True, "ingested": n}
 
+    # ---------- Endpoints de custo e uso ----------
+    @app.get("/custo/echotok")
+    async def custo_echotok(
+        chamadas_dia: int = 300,
+        preco_por_mil: float = 5.0,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Calcula custo mensal estimado da API EchoTok."""
+        custo_dia = (chamadas_dia * 30 / 1000) * preco_por_mil
+        return {
+            "ok": True,
+            "provedor": "echotok",
+            "chamadas_dia": chamadas_dia,
+            "preco_por_mil": preco_por_mil,
+            "custo_dia_brl": round(custo_dia, 2),
+            "custo_mes_brl": round(custo_dia * 30, 2),
+            "cota_diaria": cfg.echotok_daily_limit,
+            "usado_hoje": st.api_usage("echotok", echotok_day()),
+        }
+
+    @app.get("/custo/llm")
+    async def custo_llm(
+        provedor: str = "gemini",
+        modelo: str | None = None,
+        tokens_entrada_dia: int = 120000,
+        tokens_saida_dia: int = 40000,
+        preco_entrada_1m: float | None = None,
+        preco_saida_1m: float | None = None,
+        cambio: float = 5.40,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Calcula custo diário e mensal estimado de LLM.
+        Preços por 1M tokens em USD. Se não informados, usa valores default
+        conhecidos para provedores populares."""
+        # Preços default por 1M tokens (USD) - valores de referência
+        PRECOS_DEFAULT = {
+            "gemini": {"pin": 0.75, "pout": 3.75},
+            "openrouter": {"pin": 0.0, "pout": 0.0},
+            "claude": {"pin": 0.10, "pout": 0.50},
+            "openai": {"pin": 0.10, "pout": 0.50},
+            "deepseek": {"pin": 0.0, "pout": 0.0},
+            "omnirouter": {"pin": 0.0, "pout": 0.0},
+        }
+
+        pin = preco_entrada_1m
+        pout = preco_saida_1m
+
+        default = PRECOS_DEFAULT.get(provedor, {"pin": 0.0, "pout": 0.0})
+        if pin is None:
+            pin = default["pin"]
+        if pout is None:
+            pout = default["pout"]
+
+        custo_dia_usd = (tokens_entrada_dia * pin + tokens_saida_dia * pout) / 1_000_000
+        custo_dia_brl = custo_dia_usd * cambio
+        return {
+            "ok": True,
+            "provedor": provedor,
+            "modelo": modelo or "",
+            "tokens_entrada_dia": tokens_entrada_dia,
+            "tokens_saida_dia": tokens_saida_dia,
+            "preco_entrada_1m_usd": pin,
+            "preco_saida_1m_usd": pout,
+            "cambio": cambio,
+            "custo_dia_usd": round(custo_dia_usd, 4),
+            "custo_dia_brl": round(custo_dia_brl, 2),
+            "custo_mes_usd": round(custo_dia_usd * 30, 4),
+            "custo_mes_brl": round(custo_dia_brl * 30, 2),
+            "nota": "Preços de referência. Confirme na tabela oficial do provedor.",
+        }
+
+    PROVIDORES_PY = [
+        {"id": "openrouter", "nome": "OpenRouter", "tipo": "llm", "limite_dia": 50, "limite_mes": 0},
+        {"id": "gemini", "nome": "Google Gemini", "tipo": "llm", "limite_dia": 250, "limite_mes": 0},
+        {"id": "omnirouter", "nome": "OmniRouter", "tipo": "llm", "limite_dia": 0, "limite_mes": 0},
+        {"id": "claude", "nome": "Claude (Anthropic)", "tipo": "llm", "limite_dia": 0, "limite_mes": 0},
+        {"id": "deepseek", "nome": "DeepSeek", "tipo": "llm", "limite_dia": 0, "limite_mes": 0},
+        {"id": "openai", "nome": "OpenAI", "tipo": "llm", "limite_dia": 0, "limite_mes": 0},
+        {"id": "serpapi", "nome": "SerpAPI", "tipo": "dados", "limite_dia": 0, "limite_mes": 250},
+        {"id": "echotok", "nome": "EchoTok Data API", "tipo": "dados", "limite_dia": 50, "limite_mes": 0},
+    ]
+
+    @app.get("/uso/provedores")
+    async def uso_provedores(_: None = Depends(require_token)) -> dict:
+        """Retorna contadores de uso por provedor (dia) do SQLite."""
+        provedores = []
+        hoje = datetime.now(timezone.utc).date().isoformat()
+        for p in PROVIDORES_PY:
+            try:
+                uso_dia = st.api_usage(p["id"], hoje)
+            except Exception:
+                uso_dia = 0
+            provedores.append({
+                "id": p["id"],
+                "nome": p["nome"],
+                "tipo": p["tipo"],
+                "limite_dia": p["limite_dia"],
+                "limite_mes": p["limite_mes"],
+                "uso_dia": uso_dia,
+            })
+        return {"ok": True, "provedores": provedores, "data": hoje}
+
     # ---------- Mass Messaging HITL (Wechaty) ----------
     # Inicializa componentes de messaging
     template_engine = TemplateEngine(sandboxed=True)
