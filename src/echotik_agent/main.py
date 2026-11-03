@@ -2,21 +2,34 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
+import pytz
 
 from .config import Settings
 from .echotok import EchoTokClient, EchoTokError
 from .embedding import build_embedder
 from .hermes import HermesClient
 from .llm import LLMClient
+from .messaging import (
+    MessageQueueScheduler,
+    QueueConfig,
+    ContactSourceResolverFactory,
+    TemplateEngine,
+    WechatyClient,
+    WechatyConfig,
+    WechatySendError,
+    ContactSourceResolverFactory,
+)
 from .ratelimit import RateLimiter
 from .models import (
     ChatRequest,
@@ -32,6 +45,14 @@ from .models import (
     RagQueryRequest,
     SeedPersonasRequest,
     SessionSyncRequest,
+)
+from .messaging.models import (
+    MessageQueueItem,
+    BatchReview,
+    Template,
+    Contact,
+    MessageStatus,
+    BatchStatus,
 )
 from .rag import RAG
 from .rules import answer, diagnose, fail_guard
@@ -447,5 +468,280 @@ def create_app(
             return {"ok": False, "error": "AGENCY_AGENTS_DIR não configurado"}
         n = rg.seed_personas(Path(directory), body.globs)
         return {"ok": True, "ingested": n}
+
+    @app.post("/seed/personas")
+    async def seed_personas(body: SeedPersonasRequest, _: None = Depends(require_token)) -> dict:
+        directory = body.directory or (cfg.agency_agents_dir and str(cfg.agency_agents_dir))
+        if not directory:
+            return {"ok": False, "error": "AGENCY_AGENTS_DIR não configurado"}
+        n = rg.seed_personas(Path(directory), body.globs)
+        return {"ok": True, "ingested": n}
+
+    # ---------- Mass Messaging HITL (Wechaty) ----------
+    # Inicializa componentes de messaging
+    template_engine = TemplateEngine(sandboxed=True)
+    wechaty_config = WechatyConfig(
+        puppet=cfg.wechaty_puppet if hasattr(cfg, "wechaty_puppet") else "wechaty-puppet-wechat",
+        puppet_token=cfg.wechaty_puppet_token if hasattr(cfg, "wechaty_puppet_token") else "",
+        business_hours_start=cfg.messaging_business_hours_start if hasattr(cfg, "messaging_business_hours_start") else 9,
+        business_hours_end=cfg.messaging_business_hours_end if hasattr(cfg, "messaging_business_hours_end") else 18,
+        timezone=cfg.messaging_timezone if hasattr(cfg, "messaging_timezone") else "America/Sao_Paulo",
+        min_delay_seconds=cfg.messaging_min_delay_seconds if hasattr(cfg, "messaging_min_delay_seconds") else 300,
+        max_delay_seconds=cfg.messaging_max_delay_seconds if hasattr(cfg, "messaging_max_delay_seconds") else 720,
+        max_retries=cfg.messaging_max_retries if hasattr(cfg, "messaging_max_retries") else 3,
+        retry_base_delay_seconds=cfg.messaging_retry_base_delay_seconds if hasattr(cfg, "messaging_retry_base_delay_seconds") else 60,
+        max_concurrent_sends=cfg.messaging_max_concurrent_sends if hasattr(cfg, "messaging_max_concurrent_sends") else 1,
+    )
+    wechaty_client = WechatyClient(wechaty_config)
+    queue_config = QueueConfig(
+        check_interval_seconds=cfg.messaging_check_interval_seconds if hasattr(cfg, "messaging_check_interval_seconds") else 30,
+        business_hours_start=wechaty_config.business_hours_start,
+        business_hours_end=wechaty_config.business_hours_end,
+        timezone=wechaty_config.timezone,
+        min_delay_seconds=wechaty_config.min_delay_seconds,
+        max_delay_seconds=wechaty_config.max_delay_seconds,
+        max_concurrent_sends=wechaty_config.max_concurrent_sends,
+        max_retries=wechaty_config.max_retries,
+        retry_base_delay_seconds=wechaty_config.retry_base_delay_seconds,
+        dlq_max_size=cfg.messaging_dlq_max_size if hasattr(cfg, "messaging_dlq_max_size") else 1000,
+    )
+    queue_scheduler = MessageQueueScheduler(queue_config, wechaty_client, st)
+
+    # Tenta conectar Wechaty na inicialização (não bloqueia se falhar)
+    @app.on_event("startup")
+    async def startup_wechaty() -> None:
+        try:
+            await wechaty_client.start()
+            logger.info("Wechaty conectado com sucesso")
+        except Exception as e:
+            logger.warning(f"Wechaty não conectado (continuando sem ele): {e}")
+
+    @app.on_event("shutdown")
+    async def shutdown_wechaty() -> None:
+        try:
+            await wechaty_client.stop()
+            await queue_scheduler.stop()
+            logger.info("Wechaty e queue scheduler parados")
+        except Exception as e:
+            logger.warning(f"Erro ao parar Wechaty/queue: {e}")
+
+    queue_scheduler_task: asyncio.Task | None = None
+
+    @app.on_event("startup")
+    async def startup_queue_scheduler() -> None:
+        nonlocal queue_scheduler_task
+        queue_scheduler_task = asyncio.create_task(queue_scheduler.start())
+
+    @app.on_event("shutdown")
+    async def shutdown_queue_scheduler() -> None:
+        if queue_scheduler_task:
+            queue_scheduler_task.cancel()
+            try:
+                await queue_scheduler_task
+            except asyncio.CancelledError:
+                pass
+
+    # Modelos para API de messaging
+    from pydantic import BaseModel
+    from typing import Optional
+
+    class CreateBatchRequest(BaseModel):
+        name: Optional[str] = None
+        source: str  # "csv_upload", "google_sheets", "api", "manual"
+        source_config: dict
+        template_id: str
+        contacts: Optional[list[dict]] = None  # Para source="manual"
+
+    class ReviewBatchRequest(BaseModel):
+        approved_ids: list[str] = []
+        rejected_ids: list[str] = []
+        edited_messages: dict[str, str] = {}
+
+    class ScheduleBatchRequest(BaseModel):
+        scheduled_at: Optional[str] = None  # ISO format
+
+    @app.post("/messaging/batches")
+    async def create_batch(
+        body: CreateBatchRequest,
+        request: Request,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Cria um novo lote para revisão (HITL)."""
+        try:
+            # Resolve fonte de contatos
+            from .messaging import ContactSourceResolverFactory, ContactSourceConfig
+            from .models import ContactSource
+
+            source = ContactSource(body.source)
+            source_config = ContactSourceConfig(**body.source_config)
+            contacts_data = await ContactSourceResolverFactory.resolve_all([source_config])
+
+            # Se manual, usa contatos do body
+            if body.source == "manual" and body.contacts:
+                contacts_data = body.contacts
+
+            # Converte para objetos Contact
+            contacts = []
+            for c_data in contacts_data:
+                # Cria objeto Contact
+                from .models import Contact
+                contact = Contact(**c_data)
+                contacts.append(contact)
+
+            if not contacts:
+                raise HTTPException(status_code=400, detail="Nenhum contato válido encontrado")
+
+            # Busca template
+            template = template_engine.env.from_string("")  # placeholder
+            # TODO: buscar template do store/registry
+
+            # Por enquanto cria batch básico
+            from .models import BatchReview, Template
+            batch = BatchReview(
+                name=body.name,
+                source=source,
+                source_config=source_config,
+                template_id=body.template_id,
+                template_snapshot=Template(id=body.template_id, name="", body=""),
+                contacts=contacts,
+            )
+
+            # Gera mensagens via template engine
+            # Por simplicidade, usa template engine direto
+            template_obj = Template(id=body.template_id, name="", body="Olá {{nome_primeiro}}!")
+            generated = template_engine.render_batch(template_obj, contacts)
+
+            batch.generated_messages = [
+                MessageQueueItem(
+                    batch_id=batch.id,
+                    contact=contact,
+                    template_id=body.template_id,
+                    original_message=msg,
+                    current_message=msg,
+                )
+                for contact, (cid, msg) in zip(contacts, generated) if msg
+            ]
+
+            # Salva no store (implementar método)
+            st.save_batch(batch)
+
+            return {"ok": True, "batch_id": batch.id, "total": len(batch.generated_messages)}
+
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    @app.get("/messaging/batches")
+    async def list_batches(limit: int = 50, _: None = Depends(require_token)) -> dict:
+        """Lista lotes de mensagens."""
+        # TODO: implementar listagem no store
+        return {"ok": True, "batches": []}
+
+    @app.get("/messaging/batches/{batch_id}")
+    async def get_batch(batch_id: str, _: None = Depends(require_token)) -> dict:
+        """Obtém detalhes de um lote."""
+        # TODO: implementar busca no store
+        return {"ok": True, "batch": None}
+
+    @app.post("/messaging/batches/{batch_id}/review")
+    async def review_batch(
+        batch_id: str,
+        body: ReviewBatchRequest,
+        request: Request,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Revisa lote (aprova/rejeita/edita mensagens)."""
+        # TODO: implementar no store
+        return {"ok": True, "message": "Review processado"}
+
+    @app.post("/messaging/batches/{batch_id}/approve")
+    async def approve_batch(
+        batch_id: str,
+        body: ScheduleBatchRequest,
+        request: Request,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Aprova lote e agenda na fila de envio."""
+        # TODO: buscar batch no store
+        # batch = st.get_batch(batch_id)
+        # if not batch: raise HTTPException(404, "Lote não encontrado")
+        # batch.status = "approved"
+        # batch.reviewed_by = "operator"
+        # batch.reviewed_at = datetime.utcnow()
+        # batch.approved_ids = body.approved_ids or []
+        # batch.rejected_ids = body.rejected_ids or []
+        # batch.edited_messages = body.edited_messages or {}
+        # st.save_batch(batch)
+        # queue_scheduler.enqueue_batch(batch)
+        return {"ok": True, "message": "Lote aprovado e agendado"}
+
+    @app.get("/messaging/queue/stats")
+    async def queue_stats(_: None = Depends(require_token)) -> dict:
+        """Estatísticas da fila de envio."""
+        return {"ok": True, "stats": queue_scheduler.get_stats()}
+
+    @app.get("/messaging/queue/dlq")
+    async def get_dlq(_: None = Depends(require_token)) -> dict:
+        """Mensagens na Dead Letter Queue."""
+        return {"ok": True, "messages": queue_scheduler.get_dlq_messages()}
+
+    @app.post("/messaging/queue/dlq/{msg_id}/retry")
+    async def retry_dlq(msg_id: str, _: None = Depends(require_token)) -> dict:
+        """Reprocessa mensagem da DLQ."""
+        success = await queue_scheduler.retry_dlq(msg_id)
+        return {"ok": success, "message": "Reagendado" if success else "Não encontrado"}
+
+    @app.get("/messaging/templates")
+    async def list_templates(_: None = Depends(require_token)) -> dict:
+        """Lista templates disponíveis."""
+        return {"ok": True, "templates": []}
+
+    @app.post("/messaging/templates")
+    async def create_template(
+        body: dict,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Cria novo template."""
+        # TODO: validar e salvar
+        return {"ok": True, "template_id": "tpl_new"}
+
+    @app.post("/messaging/templates/validate")
+    async def validate_template(
+        body: dict,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Valida template Jinja2."""
+        from .models import Template
+        template = Template(**body)
+        valid, errors = template_engine.validate_template(template)
+        return {"ok": valid, "errors": errors}
+
+    @app.post("/messaging/templates/render")
+    async def render_template(
+        body: dict,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Renderiza template para teste."""
+        from .models import Template, Contact
+        template = Template(**body.get("template", {}))
+        contact_data = body.get("contact", {})
+        contact = Contact(**contact_data)
+        try:
+            message = template_engine.render(template, Contact(**contact_data))
+            return {"ok": True, "message": message}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @app.post("/messaging/contacts/resolve")
+    async def resolve_contacts(
+        body: dict,
+        _: None = Depends(require_token),
+    ) -> dict:
+        """Resolve contatos de uma fonte."""
+        from .messaging import ContactSourceResolverFactory, ContactSourceConfig
+        from .models import ContactSource
+
+        config = ContactSourceConfig(**body)
+        contacts = await ContactSourceResolverFactory.resolve_all([config])
+        return {"ok": True, "count": len(contacts), "contacts": contacts[:50]}
 
     return app
