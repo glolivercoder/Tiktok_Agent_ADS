@@ -359,6 +359,9 @@ td .actions { display: flex; gap: 8px; justify-content: flex-end; align-items: c
 </svg>
 
 <div class="app">
+  <div id="bannerSimulado" class="notice neutral" style="margin:0;padding:10px 32px;text-align:center;font-size:13px;display:none;">
+    <strong>⚠ Dados simulados em uso.</strong> Os produtos, nichos e campanhas mostrados s\u00e3o exemplos. Para dados reais da EchoTok, configure ECHOTOK_API_KEY no .env do sidecar e clique em "Importar 10 produtos" na tela Dados e APIs.
+  </div>
   <nav class="rail" aria-label="Navegação principal">
     <a class="mark" href="#/visao" title="EchoHub · inteligência de afiliados TikTok Shop" aria-label="EchoHub, início">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 10v4M7.5 6v12M12 3v18M16.5 7v10M21 10v4"/></svg>
@@ -1529,6 +1532,16 @@ function updateFavicon(route) {
   if (l.dataset.kind !== want) { l.dataset.kind = want; l.href = FAVICONS[want]; }
 }
 
+function updateBanner() {
+  const b = $('#bannerSimulado');
+  if (!b) return;
+  if (state.fonte === 'simulado') {
+    b.style.display = 'block';
+  } else {
+    b.style.display = 'none';
+  }
+}
+
 /* a rota ativa carrega o único h1 do documento; as outras telas ficam com h2 */
 function fixHeadings(route) {
   $$('.view').forEach((v) => {
@@ -1560,6 +1573,7 @@ function navigate() {
   $('#navSheet').classList.remove('open');
   document.title = TITULOS[r] + ' \u00B7 EchoHub';
   updateFavicon(r);
+  updateBanner();
   RENDER[r]();
 }
 function go(r) {
@@ -2107,39 +2121,61 @@ async function importEchoTok() {
     $('#testResult').innerHTML = noticeHTML('warn', 'Configure o sidecar em <strong>Configura\u00E7\u00F5es \u2192 Agente sidecar</strong> (URL + token) antes de importar.');
     return;
   }
-  $('#testResult').innerHTML = noticeHTML('neutral', 'Importando produtos da EchoTok via sidecar\u2026');
+  $('#testResult').innerHTML = noticeHTML('neutral', 'Importando produtos reais da EchoTok via sidecar\u2026');
   try {
-    const r = await sidecarFetch('/echotok/import', {
-      method: 'POST',
-      body: JSON.stringify({ region: 'BR', pageSize: 10, pageNum: 1, includeCategories: true }),
-    }, 30000);
-    const j = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(sidecarErrorDetail(j, r.status));
-    const list = Array.isArray(j && j.products) ? j.products : [];
-    if (!list.length) {
-      $('#testResult').innerHTML = noticeHTML('warn', 'A EchoTok respondeu sem produtos para os filtros atuais. Nada foi alterado.');
-      return;
-    }
+    const TARGET_MIN = 15; // no mínimo 15 produtos reais
+    const PAGE_SIZE = 20;  // máximo permitido pela API
     const seen = new Set();
     const mapped = [];
-    list.forEach((api) => {
-      const p = apiToProduct(api);
-      while (seen.has(p.id)) p.id = (p.id + 1) % 1000000 || 1;
-      seen.add(p.id);
-      mapped.push(p);
-    });
+    let pageNum = 1;
+    let totalUsed = 0;
+
+    while (mapped.length < TARGET_MIN) {
+      const r = await sidecarFetch('/echotok/import', {
+        method: 'POST',
+        body: JSON.stringify({ region: 'BR', pageSize: PAGE_SIZE, pageNum: pageNum, includeCategories: true }),
+      }, 30000);
+      const j = await r.json().catch(() => null);
+      if (!r.ok) throw new Error(sidecarErrorDetail(j, r.status));
+      const list = Array.isArray(j && j.products) ? j.products : [];
+      if (!list.length) break; // sem mais produtos
+
+      list.forEach((api) => {
+        const p = apiToProduct(api);
+        while (seen.has(p.id)) p.id = (p.id + 1) % 1000000 || 1;
+        seen.add(p.id);
+        mapped.push(p);
+      });
+
+      const q = (j && j.quota) || {};
+      totalUsed = +q.used || 0;
+      const limit = +q.limit || 0;
+      if (totalUsed >= limit) break; // cota esgotada
+
+      pageNum++;
+      if (pageNum > 100) break; // segurança contra loop infinito
+    }
+
+    if (!mapped.length) {
+      $('#testResult').innerHTML = noticeHTML('warn', 'A EchoTok respondeu sem produtos reais. Nada foi alterado.');
+      return;
+    }
+
     products.length = 0;
     products.push(...mapped);
     recomputarProdutos();
     state.fonte = 'api';
     state.selected = products[0].id;
     state.categoria = '';
-    const q = (j && j.quota) || {};
-    if (q.limit) state.config.real.echotok = { per: 'dia', used: +q.used || 0, limit: +q.limit };
+    state.config.real.echotok = { per: 'dia', used: totalUsed, limit: 50 };
     persist();
-    $('#testResult').innerHTML = noticeHTML('pos', `${mapped.length} produtos importados da EchoTok. Cota do dia: ${q.used ?? '?'}/${q.limit ?? '?'}. A sess\u00E3o do agente agora usa esta tabela.`);
-    toast('EchoTok API: produtos importados.');
+    const q = { used: totalUsed, limit: 50 };
+    $('#testResult').innerHTML = noticeHTML('pos', `${mapped.length} produtos reais importados da EchoTok. Cota do dia: ${q.used}/${q.limit}. Dados simulados substitu\u00eddos.`);
+    toast(`EchoTok API: ${mapped.length} produtos reais importados.`);
     RENDER.dados();
+    // Re-renderiza a visão geral se estiver ativa
+    if (currentRoute === 'visao') RENDER.visao();
+    if (currentRoute === 'produtos') RENDER.produtos();
   } catch (e) {
     const why = e.name === 'AbortError' ? 'tempo esgotado (30s)' : /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
     $('#testResult').innerHTML = noticeHTML('warn', '<strong>Importa\u00E7\u00E3o falhou:</strong> ' + esc(why) + '.');
@@ -3002,7 +3038,7 @@ bindEvents();
 
 async function initRealData() {
   if (!sidecarReady()) {
-    addMsg('ai', 'Sou o agente desta sess\u00E3o e respondo pelos dados carregados aqui (fonte: <strong>' + FONTE_LABEL[state.fonte] + '</strong>). Configure o sidecar em Configura\u00E7\u00F5es \u2192 Agente sidecar para conectar dados reais.');
+    addMsg('ai', 'Sou o agente desta sess\u00E3o. <strong>Dados simulados em uso.</strong> Configure o sidecar em Configura\u00E7\u00F5es \u2192 Agente sidecar (URL + token) para conectar dados reais da EchoTok.');
   } else {
     try {
       const r = await sidecarFetch('/echotok/status', { method: 'GET' }, 8000);
@@ -3013,10 +3049,10 @@ async function initRealData() {
         addMsg('ai', 'EchoTok Data API est\u00E1 configurada (' + (j.region || 'BR') + '). Cota: ' + usado + '/' + limite + ' hoje. Importando produtos reais...');
         await importEchoTok();
       } else {
-        addMsg('ai', 'Sou o agente desta sess\u00E3o e respondo pelos dados carregados aqui (fonte: <strong>' + FONTE_LABEL[state.fonte] + '</strong>). A EchoTok Data API n\u00e3o est\u00e1 configurada no sidecar. Defina ECHOTOK_API_KEY no .env para usar dados reais.');
+        addMsg('ai', '<strong>Aten\u00e7\u00e3o:</strong> Dados simulados em uso. A EchoTok Data API n\u00e3o est\u00e1 configurada no sidecar. Defina ECHOTOK_API_KEY (ou ECHOTOK_API_USER/PASSWORD) no .env do sidecar para usar dados reais.');
       }
     } catch (e) {
-      addMsg('ai', 'Sou o agente desta sess\u00E3o e respondo pelos dados carregados aqui (fonte: <strong>' + FONTE_LABEL[state.fonte] + '</strong>). N\u00e3o foi poss\u00edvel verificar o status da EchoTok Data API.');
+      addMsg('ai', '<strong>Aten\u00e7\u00e7\u00e3o:</strong> Dados simulados em uso. N\u00e3o foi poss\u00edvel verificar o status da EchoTok Data API.');
     }
   }
 }
