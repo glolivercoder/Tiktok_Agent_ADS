@@ -72,6 +72,19 @@ class Store:
                     payload TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    detail TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS api_usage (
+                    provider TEXT NOT NULL,
+                    day TEXT NOT NULL,
+                    calls INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (provider, day)
+                );
                 """
             )
 
@@ -112,6 +125,63 @@ class Store:
             return SessionSyncRequest(**json.loads(row["payload"]))
         except Exception:
             return None
+
+    def audit(self, event: str, actor: str = "local", detail: Any = None) -> None:
+        """Registra ação operacional sem segredos nem conteúdo bruto."""
+        payload = detail if isinstance(detail, str) else json.dumps(detail or {}, ensure_ascii=False)
+        with self._conn() as c:
+            c.execute(
+                "INSERT INTO audit_log(event,actor,detail,created_at) VALUES(?,?,?,?)",
+                (event, actor, payload, _now()),
+            )
+
+    def list_audit(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self._conn() as c:
+            rows = c.execute(
+                "SELECT id,event,actor,detail,created_at FROM audit_log ORDER BY id DESC LIMIT ?",
+                (max(1, min(limit, 500)),),
+            ).fetchall()
+        out = []
+        for row in rows:
+            try:
+                detail = json.loads(row["detail"])
+            except Exception:
+                detail = row["detail"]
+            out.append(
+                {
+                    "id": row["id"],
+                    "event": row["event"],
+                    "actor": row["actor"],
+                    "detail": detail,
+                    "createdAt": row["created_at"],
+                }
+            )
+        return out
+
+    def api_usage(self, provider: str, day: str) -> int:
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT calls FROM api_usage WHERE provider=? AND day=?",
+                (provider, day),
+            ).fetchone()
+        return int(row["calls"]) if row else 0
+
+    def consume_api_quota(self, provider: str, day: str, limit: int) -> tuple[bool, int]:
+        """Incrementa o contador diário se ainda houver cota. Retorna (ok, uso)."""
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT calls FROM api_usage WHERE provider=? AND day=?",
+                (provider, day),
+            ).fetchone()
+            current = int(row["calls"]) if row else 0
+            if current >= limit:
+                return False, current
+            c.execute(
+                "INSERT INTO api_usage(provider,day,calls) VALUES(?,?,1) "
+                "ON CONFLICT(provider,day) DO UPDATE SET calls=calls+1",
+                (provider, day),
+            )
+            return True, current + 1
 
     def record_decision(self, d: DecisionIn) -> DecisionOut:
         with self._conn() as c:

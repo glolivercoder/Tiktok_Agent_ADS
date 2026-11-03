@@ -5,31 +5,21 @@ Segredos nunca entram no RAG. Conteúdo ingerido é dado não confiável.
 
 from __future__ import annotations
 
-import hashlib
-import math
-import re
+import json
 from pathlib import Path
 from typing import Any
 
 import lancedb
 import pyarrow as pa
 
+from .embedding import Embedder, HashEmbedder
+
 COLLECTIONS = ("skills", "personas", "research", "decisions")
 
 
-def _tokens(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9]{3,}", (text or "").lower())
-
-
 def embed(text: str, dim: int = 384) -> list[float]:
-    vec = [0.0] * dim
-    for tok in _tokens(text):
-        h = hashlib.sha256(tok.encode("utf-8")).digest()
-        idx = int.from_bytes(h[:4], "little") % dim
-        sign = 1.0 if (h[4] & 1) == 0 else -1.0
-        vec[idx] += sign
-    norm = math.sqrt(sum(v * v for v in vec)) or 1.0
-    return [v / norm for v in vec]
+    """Compatibilidade: embedding hash local (usado em testes/fallback)."""
+    return HashEmbedder(dim).embed(text)
 
 
 def _cos(a: list[float], b: list[float]) -> float:
@@ -37,12 +27,22 @@ def _cos(a: list[float], b: list[float]) -> float:
 
 
 class RAG:
-    def __init__(self, path: Path, dim: int = 384) -> None:
+    def __init__(
+        self,
+        path: Path,
+        dim: int = 384,
+        embedder: Embedder | None = None,
+    ) -> None:
         self.path = Path(path)
         self.path.mkdir(parents=True, exist_ok=True)
-        self.dim = dim
+        self.embedder: Embedder = embedder or HashEmbedder(dim)
+        self.dim = int(getattr(self.embedder, "dim", dim))
         self.db = lancedb.connect(str(self.path))
         self._ensure()
+
+    @property
+    def embedder_name(self) -> str:
+        return str(getattr(self.embedder, "name", "hash"))
 
     def _ensure(self) -> None:
         if "docs" not in self.db.table_names():
@@ -56,9 +56,26 @@ class RAG:
                 ]
             )
             self.db.create_table("docs", schema=schema)
+            return
+        # Evita erro obscuro ao trocar ECHOTIK_EMBED_DIM com um LanceDB antigo.
+        schema = self.db.open_table("docs").schema
+        vector_type = schema.field("vector").type
+        existing_dim = getattr(vector_type, "list_size", self.dim)
+        if existing_dim != self.dim:
+            raise RuntimeError(
+                f"LanceDB em {self.path} tem vetores dim={existing_dim}, "
+                f"mas o embedder atual usa dim={self.dim}. "
+                "Use ECHOTIK_EMBED_DIM igual ou remova a pasta do LanceDB."
+            )
 
     def _table(self):
         return self.db.open_table("docs")
+
+    def count(self, collection: str | None = None) -> int:
+        rows = self._table().to_arrow().to_pylist()
+        if collection is None:
+            return len(rows)
+        return sum(1 for row in rows if row.get("collection") == collection)
 
     def ingest(self, docs: list[dict[str, Any]], collection: str = "skills") -> int:
         if collection not in COLLECTIONS:
@@ -74,8 +91,8 @@ class RAG:
                     "id": str(d.get("id") or f"{collection}-{i}"),
                     "collection": collection,
                     "text": text,
-                    "metadata": __import__("json").dumps(meta, ensure_ascii=False),
-                    "vector": embed(text, self.dim),
+                    "metadata": json.dumps(meta, ensure_ascii=False),
+                    "vector": self.embedder.embed(text),
                 }
             )
         if not rows:
@@ -88,7 +105,7 @@ class RAG:
         import json as _j
 
         tbl = self._table()
-        qv = embed(q, self.dim)
+        qv = self.embedder.embed(q)
         try:
             res = tbl.search(qv).where(f"collection = '{collection}'").limit(limit).to_list()
         except Exception:
@@ -116,7 +133,7 @@ class RAG:
                 cands = all_rows
             scored = []
             for r in cands:
-                sc = _cos(embed(str(r.get("text") or ""), self.dim), qv)
+                sc = _cos(self.embedder.embed(str(r.get("text") or "")), qv)
                 scored.append((sc, r))
             scored.sort(key=lambda x: x[0], reverse=True)
             for sc, r in scored[:limit]:
@@ -134,6 +151,58 @@ class RAG:
                     }
                 )
         return out
+
+    def seed_skills(self, directory: Path | None) -> int:
+        """Ingere o catálogo 80/20 + markdowns de compliance/SEO uma única vez."""
+        if not directory:
+            return 0
+        base = Path(directory)
+        if not base.exists():
+            return 0
+        if self.count("skills") > 0:
+            return 0
+
+        docs: list[dict[str, Any]] = []
+        catalog = base / "strategic_skills.json"
+        if catalog.exists():
+            try:
+                raw = json.loads(catalog.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = []
+            if isinstance(raw, list):
+                for index, skill in enumerate(raw):
+                    if not isinstance(skill, dict):
+                        continue
+                    parts = [
+                        str(skill.get(key) or "")
+                        for key in ("name", "when_to_use", "prompt")
+                    ]
+                    text = "\n".join(part for part in parts if part.strip())
+                    if not text.strip():
+                        continue
+                    docs.append(
+                        {
+                            "id": f"skill-{skill.get('id') or index}",
+                            "text": text[:8000],
+                            "name": skill.get("name") or "",
+                            "kind": "skill",
+                        }
+                    )
+        for path in sorted(base.glob("*.md")):
+            try:
+                text = path.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if text.strip():
+                docs.append(
+                    {
+                        "id": f"skill-md-{path.stem}",
+                        "text": text[:8000],
+                        "name": path.stem,
+                        "kind": "skill",
+                    }
+                )
+        return self.ingest(docs, collection="skills")
 
     def seed_personas(self, directory: Path, globs: list[str]) -> int:
         base = Path(directory)

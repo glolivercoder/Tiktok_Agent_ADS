@@ -1,0 +1,19 @@
+services:
+  echotik-agent:
+    build: .
+    image: echotik-agent:local
+    env_file:
+      - .env
+    environment:
+      ECHOTIK_AGENT_DATA_DIR: /data
+      ECHOTIK_SKILLS_PATH: /app/data/skills/strategic_skills.json
+    ports:
+      - "127.0.0.1:5077:5077"
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

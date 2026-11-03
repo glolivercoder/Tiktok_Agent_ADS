@@ -21,6 +21,21 @@ Health: `GET http://127.0.0.1:5077/health` (aberto por padrão; desative com `EC
 - `GET /skills` lista o catálogo (sem prompts completos); `POST /chat` devolve `skillsUsed`, `llmProvider` e `llmModel`.
 - `POST /chat` sem `session` usa a última sessão salva em `POST /session/sync`.
 
+## Docker
+
+```powershell
+docker compose up --build
+```
+
+O container escuta apenas em `127.0.0.1:5077`, roda como usuário não-root, monta `./data` em `/data` e lê o `.env` local (não versionado). O `compose.yaml` usa `read_only`, `tmpfs` e `no-new-privileges`. A imagem define `ECHOTIK_SKILLS_PATH` para o catálogo copiado em `/app/data/skills`.
+
+## Rate-limit e auditoria
+
+- `ECHOTIK_RATE_LIMIT_PER_MIN` (default 120) e `ECHOTIK_RATE_LIMIT_BURST` (default 30) aplicam um token bucket por IP. `0` desativa.
+- `/health` e preflight `OPTIONS` ficam fora do limite.
+- A tabela `audit_log` registra evento, IP e detalhe sem conteúdo bruto: em `/chat` guarda só tamanho + SHA-256 truncado da mensagem, modo, skills, provedor e número de campanhas.
+- `GET /audit?limit=50` (Bearer) lista as últimas ações.
+
 ## Testes
 
 ```powershell

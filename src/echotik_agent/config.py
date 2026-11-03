@@ -66,12 +66,26 @@ class Settings:
     data_dir: Path
     sqlite_path: Path
     lancedb_path: Path
+    skills_dir: Path | None = None
     hermes_secrets_url: str = "http://127.0.0.1:5011"
     hermes_research_url: str = "http://127.0.0.1:5021"
     hermes_market_url: str = "http://127.0.0.1:5022"
     hermes_token: str = ""
     agency_agents_dir: Path | None = None
     embedding_dim: int = 384
+    embedding_provider: str = "hash"
+    embedding_model: str = "text-embedding-004"
+    embedding_timeout_s: float = 15.0
+    gemini_api_key: str = ""
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    echotok_base_url: str = "https://open.echotik.live/api/v3"
+    echotok_api_key: str = ""
+    echotok_api_user: str = ""
+    echotok_api_password: str = ""
+    echotok_region: str = "BR"
+    echotok_timeout_s: float = 15.0
+    echotok_daily_limit: int = 50
     max_rag_hits: int = 5
     allow_unauthenticated_health: bool = True
     # LLM (OmniRoute primeiro, OpenRouter como fallback)
@@ -85,6 +99,9 @@ class Settings:
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_api_key: str = ""
     openrouter_model: str = "openrouter/auto"
+    cors_origins: str = "*"
+    rate_limit_per_min: int = 120
+    rate_limit_burst: int = 30
 
     @classmethod
     def from_env(cls, data_dir: Path | None = None) -> "Settings":
@@ -99,11 +116,33 @@ class Settings:
         )
         base.mkdir(parents=True, exist_ok=True)
         agency_raw = os.environ.get("AGENCY_AGENTS_DIR", "").strip()
+        gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        embedding_provider = (
+            os.environ.get("ECHOTIK_EMBED_PROVIDER", "").strip().lower()
+            or ("gemini" if gemini_key else "openai" if openai_key else "hash")
+        )
+        embedding_model_default = (
+            "text-embedding-004"
+            if embedding_provider == "gemini"
+            else "text-embedding-3-small"
+            if embedding_provider == "openai"
+            else "hash-384"
+        )
+        skills_path_raw = os.environ.get("ECHOTIK_SKILLS_PATH", "").strip()
+        skills_dir_raw = os.environ.get("ECHOTIK_SKILLS_DIR", "").strip()
+        if skills_dir_raw:
+            skills_dir = Path(skills_dir_raw).expanduser()
+        elif skills_path_raw:
+            skills_dir = Path(skills_path_raw).expanduser().parent
+        else:
+            skills_dir = base / "skills"
         return cls(
             token=token,
             data_dir=base,
             sqlite_path=_env_path("ECHOTIK_SQLITE_PATH", base / "echotik.db"),
             lancedb_path=_env_path("ECHOTIK_LANCEDB_PATH", base / "lancedb"),
+            skills_dir=skills_dir,
             hermes_secrets_url=os.environ.get(
                 "HERMES_SECRETS_URL", "http://127.0.0.1:5011"
             ).strip(),
@@ -116,6 +155,24 @@ class Settings:
             hermes_token=os.environ.get("HERMES_HTTP_TOKEN", "").strip(),
             agency_agents_dir=Path(agency_raw).expanduser() if agency_raw else None,
             embedding_dim=_env_int("ECHOTIK_EMBED_DIM", 384, 64, 1536),
+            embedding_provider=embedding_provider,
+            embedding_model=(
+                os.environ.get("ECHOTIK_EMBED_MODEL", "").strip()
+                or embedding_model_default
+            ),
+            embedding_timeout_s=_env_float("ECHOTIK_EMBED_TIMEOUT", 15.0, 1.0, 60.0),
+            gemini_api_key=gemini_key,
+            openai_api_key=openai_key,
+            openai_base_url=_env_str("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+            echotok_base_url=_env_str(
+                "ECHOTIK_API_BASE_URL", "https://open.echotik.live/api/v3"
+            ),
+            echotok_api_key=os.environ.get("ECHOTOK_API_KEY", "").strip(),
+            echotok_api_user=os.environ.get("ECHOTOK_API_USER", "").strip(),
+            echotok_api_password=os.environ.get("ECHOTOK_API_PASSWORD", "").strip(),
+            echotok_region=_env_str("ECHOTIK_REGION", "BR"),
+            echotok_timeout_s=_env_float("ECHOTIK_API_TIMEOUT", 15.0, 1.0, 60.0),
+            echotok_daily_limit=_env_int("ECHOTIK_API_DAILY_LIMIT", 50, 1, 10_000),
             max_rag_hits=_env_int("ECHOTIK_MAX_RAG_HITS", 5, 1, 20),
             allow_unauthenticated_health=_env_bool("ECHOTIK_OPEN_HEALTH", True),
             llm_enabled=_env_bool("ECHOTIK_LLM_ENABLED", True),
@@ -130,6 +187,9 @@ class Settings:
             ),
             openrouter_api_key=os.environ.get("OPENROUTER_API_KEY", "").strip(),
             openrouter_model=_env_str("OPENROUTER_MODEL", "openrouter/auto"),
+            cors_origins=_env_str("ECHOTIK_CORS_ORIGINS", "*"),
+            rate_limit_per_min=_env_int("ECHOTIK_RATE_LIMIT_PER_MIN", 120, 0, 10_000),
+            rate_limit_burst=_env_int("ECHOTIK_RATE_LIMIT_BURST", 30, 1, 10_000),
         )
 
 

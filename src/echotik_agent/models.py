@@ -193,6 +193,54 @@ class SeedPersonasRequest(ApiModel):
     )
 
 
+class EchoTokImportRequest(ApiModel):
+    region: str = Field(default="BR", min_length=2, max_length=2)
+    page_size: int = Field(default=10, ge=1, le=20)
+    page_num: int = Field(default=1, ge=1, le=100)
+    category_id: str | None = None
+    sort_field: int = Field(default=5, ge=1, le=7)
+    sort_type: int = Field(default=1, ge=0, le=1)
+    language: str = Field(default="en-US", pattern=r"^(th-TH|en-US|id-ID|zh-CN|ms-MY|vi-VN)$")
+    include_categories: bool = True
+
+
+class EchoTokProduct(ApiModel):
+    id: str
+    name: str
+    category_id: str = ""
+    category: str = ""
+    category_l2_id: str = ""
+    category_l3_id: str = ""
+    price: float = 0
+    commission_pct: float = 0
+    sales_30d: int = 0
+    sales_7d: int = 0
+    sales_total: int = 0
+    gmv_30d: float = 0
+    gmv_total: float = 0
+    rating: float = 0
+    review_count: int = 0
+    trend_flag: int = 0
+    seller_id: str = ""
+    region: str = "BR"
+    cover_url: str = ""
+
+
+class QuotaInfo(ApiModel):
+    limit: int
+    used: int
+    remaining: int
+
+
+class EchoTokImportResponse(ApiModel):
+    ok: bool = True
+    source: str = "echotik"
+    count: int
+    products: list[EchoTokProduct]
+    request_id: str | None = None
+    quota: QuotaInfo
+
+
 class ErrorBody(ApiModel):
     error: str
     message: str

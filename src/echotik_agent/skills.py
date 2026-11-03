@@ -8,14 +8,29 @@ para evitar excesso de contexto.
 from __future__ import annotations
 
 import json
+import os
 import re
 import unicodedata
 from pathlib import Path
 from typing import Any
 
-DEFAULT_CATALOG = (
-    Path(__file__).resolve().parents[2] / "data" / "skills" / "strategic_skills.json"
-)
+
+def _catalog_path() -> Path:
+    """Aceita instalação via fonte, wheel ou container (env explícita)."""
+    configured = os.environ.get("ECHOTIK_SKILLS_PATH", "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    candidates = [
+        Path(__file__).resolve().parents[2] / "data" / "skills" / "strategic_skills.json",
+        Path(__file__).resolve().parent / "data" / "skills" / "strategic_skills.json",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+DEFAULT_CATALOG = _catalog_path()
 
 MAX_SKILLS = 3
 MAX_PROMPT_CHARS = 6000  # ~1.500 tokens
@@ -47,7 +62,7 @@ def _has_term(haystack: str, term: str) -> bool:
 
 
 def load_skills(path: Path | str | None = None) -> list[dict[str, Any]]:
-    catalog_path = Path(path) if path else DEFAULT_CATALOG
+    catalog_path = Path(path) if path else _catalog_path()
     try:
         raw = json.loads(catalog_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -114,6 +129,45 @@ def build_system_prompt(skills: list[dict[str, Any]]) -> str:
     return "\n".join(blocks)
 
 
+def _compact_session(payload: dict[str, Any]) -> dict[str, Any]:
+    """Resumo da sessão para caber no prompt sem cortar JSON no meio."""
+    def slim_product(product: Any, keep_series: bool = False) -> Any:
+        if not isinstance(product, dict):
+            return product
+        keys = (
+            "id",
+            "nome",
+            "preco",
+            "comissaoPct",
+            "comissaoUn",
+            "unidades30",
+            "temp",
+            "growth7",
+            "hooks",
+        )
+        out = {k: product.get(k) for k in keys if k in product}
+        if keep_series:
+            for key in ("sazonal", "vel"):
+                if product.get(key):
+                    out[key] = product[key]
+        return out
+
+    def slim_list(items: Any, limit: int, keep_series: bool = False) -> list[Any]:
+        if not isinstance(items, list):
+            return []
+        return [slim_product(item, keep_series=keep_series) for item in items[:limit]]
+
+    return {
+        "campaigns": payload.get("campaigns") or [],
+        "selected": slim_product(payload.get("selected"), keep_series=True),
+        "products": slim_list(payload.get("products"), 8),
+        "niches": (payload.get("niches") or [])[:12],
+        "subnichos": (payload.get("subnichos") or [])[:12],
+        "checklist": payload.get("checklist") or [],
+        "fonte": payload.get("fonte"),
+    }
+
+
 def build_user_prompt(
     message: str,
     session: Any | None,
@@ -126,7 +180,11 @@ def build_user_prompt(
             payload = session.model_dump(mode="json", by_alias=True)
         except Exception:
             payload = {}
-        session_json = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        compact = _compact_session(payload)
+        session_json = json.dumps(compact, ensure_ascii=False, separators=(",", ":"))
+        if len(session_json) > 6000:
+            compact["products"] = []
+            session_json = json.dumps(compact, ensure_ascii=False, separators=(",", ":"))
         parts.append("Sessão atual (dados não confiáveis):\n" + session_json[:6000])
 
     if rag_hits:
