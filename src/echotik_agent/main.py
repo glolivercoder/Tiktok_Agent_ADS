@@ -5,13 +5,17 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import logging
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 import pytz
 
@@ -97,6 +101,18 @@ def create_app(
     app.state.echotok = tok
     app.state.hermes = herm
     app.state.rate_limiter = limiter
+
+    # ---------- servir frontend EchoHub (index.html + charts.js) ----------
+    static_dir = Path(__file__).resolve().parent / "static"
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    @app.get("/", include_in_schema=False)
+    async def frontend_root() -> FileResponse:
+        return FileResponse(static_dir / "index.html")
+
+    @app.get("/charts.js", include_in_schema=False)
+    async def frontend_charts() -> FileResponse:
+        return FileResponse(static_dir / "charts.js")
 
     @app.middleware("http")
     async def rate_limit_middleware(request: Request, call_next):

@@ -1,0 +1,2923 @@
+<!doctype html>
+<!--
+  EchoHub · Central de inteligência de afiliados TikTok Shop (demonstração com dados simulados).
+  Estilo: data-terminal (tasteskill, seed 568506540) · tema escuro · paleta da marca (ciano TikTok no dado, vermelho no quente/negativo).
+  Face: figuras em JetBrains Mono (decisão do estilo data-terminal: dígitos que empilham num terminal de mercado), texto em Public Sans.
+  Grid do canvas: 12 colunas fluidas, gutters de 16px; span7 + gap16 + span5 fecham a largura (763 + 541 = 1320px em 1440).
+-->
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>EchoHub · Inteligência de afiliados TikTok Shop</title>
+<meta name="description" content="Central de inteligência para afiliados do TikTok Shop: temperatura de vendas, sazonalidade, nichos, campanhas orgânicas e pagas.">
+<link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0b0c'/%3E%3Cg fill='none' stroke='%2325f4ee' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M8 13v6M12.5 9v14M17 6v20M21.5 10v12M26 13v6'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens (data-terminal, tema escuro, paleta da marca) ---------- */
+:root {
+  --ground: #141414;        /* chrome e fundo da página */
+  --surface: #0b0b0c;       /* cartões: mais escuros que o fundo (estilo data-terminal) */
+  --well: #131316;          /* poço interno dentro do cartão */
+  --raised: #1a1a1d;        /* hover de linha, controles secundários */
+  --active: #1e1e22;        /* item selecionado (linha/linha da tabela) */
+  --border: #26262a;        /* bordas estruturais (menus, diálogos) */
+  --rule: #1b1b1e;          /* fio entre linhas de tabela */
+  --control: #3d3d43;       /* borda de input e botão outline */
+  --text: #ffffff;
+  --muted: #b3b4b9;         /* texto secundário */
+  --faint: #8f9197;         /* metadados, eixos, placeholders */
+  --accent: #25f4ee;        /* ciano da marca: só no dado e na linha de seleção de 1px */
+  --primary: #ffffff;       /* botão primário invertido: branco com texto preto */
+  --primary-ink: #000000;
+  --positive: #3fc07a; --pill-positive-bg: #14251b; --pill-positive-ink: #3fc07a;
+  --negative: #fe2c55; --pill-negative-bg: #2c1219; --pill-negative-ink: #ff6d8b;
+  --warning: #e5a93b; --pill-warning-bg: #2a2415; --pill-warning-ink: #e5a93b;
+  --pill-neutral-bg: #202024; --pill-neutral-ink: #c9cbd1;
+  --chart-1: var(--accent); --chart-2: #fe2c55; --chart-3: #e5a93b; --chart-muted: #56565c;
+  --chart-mark: var(--text);
+  --chart-span: 0.10;
+  --grid: #232327;
+  --axis-ink: #9b9da3;
+  --ink: var(--text);
+
+  --font: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; /* figuras e IDs */
+  --fs-title: 26px; --fs-section: 18px; --fs-kpi: 20px; --fs-body: 13px; --fs-small: 12px;
+
+  --rail-width: 56px;
+  --pad: 32px; --gap: 16px; --card-pad: 20px;
+  --radius-card: 8px; --radius-control: 6px; --radius-chip: 4px;
+  --control-height: 32px; --row-height: 42px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --t-press: 120ms; --t-hover: 150ms; --t-ui: 200ms;
+}
+
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; background: var(--ground); color: var(--text); font: var(--fs-body)/20px var(--font); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, h4, p, figure, ul, ol, dl, dd { margin: 0; }
+ul[class], ol[class] { padding: 0; list-style: none; }
+img, svg, video { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- shell: trilho de ícones + canvas ---------- */
+.app { display: grid; grid-template-columns: var(--rail-width) minmax(0, 1fr); min-height: 100svh; }
+.rail { position: sticky; top: 0; height: 100svh; display: flex; flex-direction: column; align-items: stretch; background: var(--ground); border-right: 1px solid var(--border); padding: 14px 0 18px; z-index: 30; }
+.rail .mark { display: flex; align-items: center; justify-content: center; height: 44px; margin-bottom: 18px; color: var(--accent); }
+.rail .mark svg { width: 24px; height: 24px; }
+.rail-group { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+.rail-group::after { content: ""; display: block; height: 1px; width: 22px; margin: 12px auto 4px; background: var(--border); }
+.rail-item { position: relative; display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 8px; color: var(--muted); transition: color var(--t-hover) ease, background-color var(--t-hover) ease; }
+.rail-item svg { width: 18px; height: 18px; stroke-width: 1.5; }
+.rail-item:hover { background: var(--raised); color: var(--text); }
+.rail-item[aria-current="page"] { color: var(--accent); background: transparent; }
+.rail-item[aria-current="page"]::after { content: ""; position: absolute; right: -9px; top: 6px; bottom: 6px; width: 1px; background: var(--accent); }
+.rail-bottom { margin-top: auto; padding: 0 8px; }
+.phonebar { display: none; }
+.sheet-nav { display: none; }
+
+.canvas { min-width: 0; padding: 28px var(--pad) 64px; }
+.view { display: none; }
+.view.on { display: block; }
+
+/* ---------- título da página e seções ---------- */
+.title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.title-row h1, .title-row h2 { font-size: var(--fs-title); line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; }
+.title-row .sub { margin-top: 6px; color: var(--muted); max-width: 88ch; }
+.title-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.stamp { color: var(--faint); font-size: var(--fs-small); display: inline-flex; align-items: center; gap: 6px; }
+.stamp .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); flex: none; }
+.stamp .dot.live { background: var(--positive); }
+.sec { margin-top: 44px; }
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.sec-head h2 { font-size: var(--fs-section); line-height: 1.35; font-weight: 500; }
+.sec-head .meta { color: var(--faint); font-size: var(--fs-small); }
+.finding { margin-top: 6px; color: var(--muted); }
+.finding strong { color: var(--text); font-weight: 500; }
+
+/* ---------- grade e cartões ---------- */
+.grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gap); }
+.grid.top { align-items: start; }
+.span4 { grid-column: span 4; } .span5 { grid-column: span 5; }
+.span6 { grid-column: span 6; } .span7 { grid-column: span 7; }
+.span8 { grid-column: span 8; } .span12 { grid-column: span 12; }
+.panel { background: var(--surface); border-radius: var(--radius-card); padding: var(--card-pad); min-width: 0; }
+.panel > header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.panel h2 { font-size: 16px; line-height: 1.35; font-weight: 600; }
+.panel .meta { color: var(--faint); font-size: var(--fs-small); }
+.colstack { display: grid; gap: var(--gap); align-content: start; }
+
+/* ---------- KPIs: uma faixa dividida por fios de 1px, sem ícones ---------- */
+.kpis { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: var(--surface); border-radius: var(--radius-card); padding: 4px 0; }
+.kpi { padding: 14px var(--card-pad); }
+.kpi + .kpi { border-left: 1px solid var(--rule); }
+.kpi-label { color: var(--muted); font-size: var(--fs-small); }
+.kpi-value { margin-top: 6px; font-size: var(--fs-kpi); line-height: 1.15; font-weight: 500; letter-spacing: -0.01em; }
+.kpi-value small { font-size: 0.55em; color: var(--muted); font-weight: 400; margin-left: 3px; font-family: var(--font); }
+.kpi-value.lead { font-size: 30px; }
+.delta { margin-top: 4px; font-size: var(--fs-small); color: var(--muted); }
+.delta .up { color: var(--positive); } .delta .down { color: var(--negative); }
+
+/* ---------- gráficos ---------- */
+.chart-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 8px; }
+.chart-head h3 { font-size: var(--fs-body); line-height: 20px; font-weight: 500; }
+.chart-head .meta { color: var(--faint); font-size: var(--fs-small); }
+.chart { position: relative; min-width: 0; }
+.chart .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 4px; }
+.chart .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); color: var(--muted); }
+.chart .legend i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+
+/* ---------- listas de linha ---------- */
+.rows { display: grid; }
+#checklistPlano { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; align-items: start; }
+#checklistPlano .rows { align-content: start; }
+.row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 0; }
+.row + .row { border-top: 1px solid var(--rule); }
+.row .grow { flex: 1; min-width: 0; }
+.row .name { font-weight: 500; }
+.row .sub2 { display: block; font-size: var(--fs-small); color: var(--muted); margin-top: 2px; }
+.rank { color: var(--faint); font-family: var(--mono); width: 26px; flex: none; }
+.chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--radius-chip); background: var(--well); color: var(--muted); font-size: var(--fs-small); white-space: nowrap; flex: none; }
+
+/* ---------- termômetro de vendas (elemento-assinatura) ---------- */
+.temp { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.temp .meter { width: 54px; height: 6px; border-radius: 3px; background: var(--well); overflow: hidden; }
+.temp .meter i { display: block; height: 100%; border-radius: 3px; background: var(--chart-muted); }
+.temp.t-hot .meter i { background: var(--negative); }
+.temp.t-warm .meter i { background: var(--warning); }
+.temp .val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: var(--fs-small); min-width: 38px; text-align: right; }
+.temp.t-hot .val { color: var(--negative); }
+.temp.t-warm .val { color: var(--warning); }
+.heat-scale { display: flex; align-items: center; gap: 8px; margin-top: 12px; color: var(--faint); font-size: var(--fs-small); }
+.heat-scale .seg { flex: 1; height: 6px; border-radius: 3px; }
+
+/* ---------- pills de estado ---------- */
+.pill { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: var(--fs-small); font-weight: 500; background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); white-space: nowrap; flex: none; }
+.pill.pos { background: var(--pill-positive-bg); color: var(--pill-positive-ink); }
+.pill.neg { background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
+.pill.warn { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
+.pill .dotm { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+
+/* ---------- tabelas ---------- */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { height: 36px; padding: 0 10px; text-align: left; font-weight: 400; font-size: var(--fs-small); color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 10px; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: var(--raised); }
+tbody tr[aria-selected="true"] td { background: var(--active); }
+th.n, td.n { text-align: right; }
+td .sub { display: block; font-size: var(--fs-small); color: var(--muted); margin-top: 2px; }
+td.m, th.n { font-variant-numeric: tabular-nums; }
+td.m { font-family: var(--mono); font-weight: 400; }
+td .unit { font-family: var(--font); color: var(--muted); font-size: var(--fs-small); }
+.truncate { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity { max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.inklink { color: var(--text); font-weight: 500; cursor: pointer; background: none; border: 0; padding: 0; font-size: var(--fs-body); white-space: nowrap; }
+.inklink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.inklink.faint { color: var(--muted); }
+
+/* ---------- controles ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: var(--control-height); padding: 0 12px; border-radius: var(--radius-control); border: 1px solid var(--control); background: transparent; color: var(--text); font-weight: 500; cursor: pointer; transition: background-color var(--t-hover) ease, transform var(--t-press) var(--ease-out); }
+.btn:hover { background: var(--raised); }
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 14px; height: 14px; stroke-width: 1.5; }
+.btn.primary { background: var(--primary); color: var(--primary-ink); border-color: transparent; }
+.btn.primary:hover { background: #e8e8e8; }
+.btn.ghost { border-color: transparent; }
+.btn.small { height: 27px; padding: 0 9px; font-size: var(--fs-small); }
+.btn.neg { color: var(--pill-negative-ink); border-color: var(--control); }
+.field { display: grid; gap: 8px; }
+.field label { font-weight: 500; font-size: var(--fs-body); }
+.field .hint { color: var(--muted); font-size: var(--fs-small); overflow-wrap: anywhere; }
+.input, select.input { height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); }
+select.input { max-width: 260px; }
+.input::placeholder { color: var(--faint); }
+.segmented { display: inline-flex; width: max-content; max-width: 100%; padding: 2px; border-radius: 8px; background: var(--well); }
+.segmented button { position: relative; height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.segmented button[aria-pressed="true"] { background: var(--raised); color: var(--text); }
+.segmented button[aria-pressed="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 2px; height: 1px; background: var(--accent); }
+.switch { appearance: none; width: 32px; height: 20px; border-radius: 999px; background: var(--control); position: relative; cursor: pointer; transition: background-color var(--t-ui) ease; flex: none; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--t-ui) var(--ease-out); }
+.switch:checked { background: var(--positive); }
+.switch:checked::after { transform: translateX(12px); }
+.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--border); margin-bottom: var(--gap); }
+.tabs button { position: relative; padding: 9px 0; color: var(--muted); background: none; border: 0; cursor: pointer; font-weight: 500; }
+.tabs button[aria-selected="true"] { color: var(--text); }
+.tabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: -8px; bottom: -1px; height: 1px; background: var(--accent); }
+.well { background: var(--well); border-radius: var(--radius-card); padding: 12px 16px; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; }
+.kv .k { color: var(--muted); }
+.kv .v { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.bignum { font-size: 36px; font-weight: 400; line-height: 1.1; letter-spacing: -0.01em; }
+.bignum small { font-size: 13px; color: var(--muted); font-family: var(--font); font-weight: 400; margin-left: 6px; }
+.bignum-label { margin-top: 6px; font-size: 16px; font-weight: 600; }
+.period { margin-top: 2px; color: var(--faint); font-size: var(--fs-small); }
+.notice { display: flex; gap: 10px; align-items: flex-start; background: var(--pill-warning-bg); border-radius: var(--radius-control); padding: 10px 12px; color: var(--pill-warning-ink); font-size: var(--fs-small); line-height: 1.45; }
+.notice.positive { background: var(--pill-positive-bg); color: var(--pill-positive-ink); }
+.notice.neutral { background: var(--well); color: var(--muted); }
+
+/* ---------- diálogos, toasts (o que flutua pode sombrear) ---------- */
+dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); padding: 20px; width: min(460px, calc(100vw - 32px)); box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55); }
+dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+dialog h3 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+dialog .field + .field { margin-top: 14px; }
+dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+#toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--raised); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 14px; font-size: var(--fs-small); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5); opacity: 0; pointer-events: none; transition: opacity var(--t-ui) ease; z-index: 80; max-width: min(480px, calc(100vw - 32px)); }
+#toast.on { opacity: 1; }
+
+/* ---------- agente (chat) ---------- */
+.chat { display: flex; flex-direction: column; min-height: 0; }
+.chat-log { display: flex; flex-direction: column; gap: 12px; padding: 4px 0 12px; min-height: 380px; max-height: 56vh; overflow-y: auto; }
+.msg { max-width: 88%; }
+.msg.user { align-self: flex-end; background: var(--well); border-radius: 10px 10px 2px 10px; padding: 9px 12px; }
+.msg.ai { align-self: flex-start; border-left: 1px solid var(--accent); padding: 2px 0 2px 12px; color: var(--muted); }
+.msg.ai strong { color: var(--text); font-weight: 500; }
+.msg.ai ol, .msg.ai ul { padding-left: 18px; display: grid; gap: 4px; margin: 4px 0; }
+.chat-form { display: flex; gap: 8px; border-top: 1px solid var(--rule); padding-top: 12px; }
+.chat-form .input { flex: 1; height: 38px; }
+.quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.quick button { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--control); background: transparent; color: var(--muted); font-size: var(--fs-small); cursor: pointer; }
+.quick button:hover { color: var(--text); border-color: var(--faint); }
+
+/* ---------- configurações em duas colunas ---------- */
+.setrow { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 24px; padding: 28px 0; }
+.setrow + .setrow { border-top: 1px solid var(--border); }
+.setrow h2 { font-size: 16px; font-weight: 600; }
+.setrow .desc { margin-top: 6px; color: var(--muted); font-size: var(--fs-body); line-height: 1.5; }
+.setrow .panel { padding: 16px; background: var(--well); }
+.setrow .field + .field { margin-top: 14px; }
+
+/* ---------- aba Configurações ---------- */
+.cfg-card { padding: 16px 16px 14px; }
+.cfg-card + .cfg-card { border-top: 1px solid var(--rule); }
+.cfg-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cfg-head .name { font-weight: 600; font-size: 14px; }
+.cfg-head svg { width: 12px; height: 12px; flex: none; }
+.cfg-head .inklink { display: inline-flex; align-items: center; gap: 4px; line-height: 1; }
+.cfg-status { margin-left: auto; display: flex; align-items: center; min-height: 22px; text-align: right; }
+.cfg-status .pill { text-align: left; }
+.cfg-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.cfg-row .input { flex: 1 1 160px; min-width: 0; width: auto; }
+.cfg-row select.input { flex: 0 1 auto; min-width: 120px; max-width: 100%; }
+.cfg-row .btn { flex: none; }
+.cfg-note { margin-top: 10px; color: var(--muted); font-size: var(--fs-small); line-height: 1.45; overflow-wrap: anywhere; }
+.cfg-usage { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: var(--fs-small); color: var(--muted); }
+.cfg-usage .meter { flex: 1 1 120px; max-width: 220px; }
+.cfg-usage.full .meter i { background: var(--negative); }
+.cfg-lbl { display: grid; gap: 6px; font-size: var(--fs-small); color: var(--muted); }
+.cfg-lbl input, .cfg-lbl select { width: 110px; }
+#tblLimites input { width: 76px; text-align: right; }
+#tblLimites code, .cfg-status code { font-family: var(--mono); font-size: 11px; }
+
+/* ---------- estados vazios / esqueleto ---------- */
+.empty { display: grid; place-items: center; min-height: 72px; padding: 14px; border: 1px dashed var(--control); border-radius: var(--radius-control); color: var(--muted); text-align: center; }
+.skeleton { background: var(--raised); border-radius: 4px; display: inline-block; }
+
+/* ---------- telefone ---------- */
+@media (max-width: 860px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .rail { display: none; }
+  .canvas { padding: 16px 16px 84px; }
+  .grid > * { grid-column: 1 / -1 !important; }
+  .kpis { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+  .kpi + .kpi { border-left: 0; }
+  .kpi:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+  .kpi:nth-child(2n) { border-left: 1px solid var(--rule); }
+  .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .phonebar { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; inset: auto 0 0 0; background: var(--surface); border-top: 1px solid var(--border); z-index: 40; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+  .phonebar a { display: grid; justify-items: center; gap: 3px; padding: 5px 0; color: var(--muted); font-size: 11px; border-radius: 8px; }
+  .phonebar a svg { width: 18px; height: 18px; stroke-width: 1.5; }
+  .phonebar a[aria-current="page"] { color: var(--accent); }
+  .setrow { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 20px 0; }
+  .sheet-nav { display: block; position: fixed; inset: 0; background: var(--ground); z-index: 60; padding: 20px; transform: translateY(100%); transition: transform var(--t-ui) var(--ease-out); }
+  .sheet-nav.open { transform: none; }
+  .sheet-nav a { display: flex; align-items: center; gap: 12px; height: 52px; color: var(--muted); border-radius: 8px; padding: 0 10px; }
+  .sheet-nav a svg { width: 18px; height: 18px; }
+  .sheet-nav a[aria-current="page"] { color: var(--accent); }
+  .title-row { flex-wrap: wrap; }
+  .bignum { font-size: 30px; }
+  select.input { max-width: none; width: 100%; }
+  .chat-log { min-height: 260px; max-height: 48vh; }
+}
+@media (max-width: 480px) {
+  .segmented { display: flex; width: 100%; }
+  .segmented button { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation: none !important; } }
+
+/* tabela vira lista de duas linhas no celular (produto e campanhas) */
+@media (max-width: 640px) {
+  #checklistPlano { grid-template-columns: 1fr; gap: 0; }
+  table.responsive, table.responsive thead, table.responsive tbody, table.responsive tr, table.responsive td { display: block; }
+  table.responsive thead { display: none; }
+  table.responsive tr { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  table.responsive td { padding: 2px 0; border: 0; }
+  table.responsive td[data-label]::before { content: attr(data-label) ": "; color: var(--faint); font-size: var(--fs-small); }
+  table.responsive td[data-label="Produto"], table.responsive td[data-label="Campanha"] { padding-bottom: 6px; }
+  table.responsive td[data-label="Produto"]::before, table.responsive td[data-label="Campanha"]::before { content: none; }
+  table.responsive td.n { text-align: left; }
+  table.responsive td .actions { justify-content: flex-start; }
+}
+td .actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+</style>
+</head>
+
+<body>
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 15a8 8 0 1 1 16 0" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M12 15l4.2-4.2" fill="none" stroke="currentColor" stroke-linecap="round"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" fill="none" stroke="currentColor" stroke-linejoin="round"/><path d="M4 7.5l8 4.5 8-4.5" fill="none" stroke="currentColor" stroke-linejoin="round"/><path d="M12 12v9" fill="none" stroke="currentColor"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor"/><path d="M15.5 8.5l-2.2 5-5 2.2 2.2-5 5-2.2z" fill="none" stroke="currentColor" stroke-linejoin="round"/></symbol>
+    <symbol id="i-mega" viewBox="0 0 24 24"><path d="M3 11l14-6.5v15L3 13v-2z" fill="none" stroke="currentColor" stroke-linejoin="round"/><path d="M7 13.8V19a1 1 0 0 0 1 1h2.2" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M17 9.6a3.2 3.2 0 0 1 0 4.8" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor"/><circle cx="12" cy="12" r="4.5" fill="none" stroke="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-plan" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="6" height="6" rx="1" fill="none" stroke="currentColor"/><path d="M13 7.5h7.5" fill="none" stroke="currentColor" stroke-linecap="round"/><rect x="3.5" y="13.5" width="6" height="6" rx="1" fill="none" stroke="currentColor"/><path d="M13 16.5h7.5" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8.5 8.5 0 0 1-12.4 7.5L4 21l1.5-4.6A8.5 8.5 0 1 1 21 12z" fill="none" stroke="currentColor" stroke-linejoin="round"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15.5" r="4" fill="none" stroke="currentColor"/><path d="M11 12.5L20 3.5" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M16.8 6.7l3 3" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M14 9.5l2 2" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.6" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 15.4" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M4 20v-5h5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M7 9l5-5 5 5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M7 11l5 5 5-5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20h16" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M7.5 4.5l12 7.5-12 7.5v-15z" fill="none" stroke="currentColor" stroke-linejoin="round"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M19.5 4.5L11 13" fill="none" stroke="currentColor" stroke-linecap="round"/><path d="M19.5 13.5V19a.5.5 0 0 1-.5.5H5.5A.5.5 0 0 1 5 19V5a.5.5 0 0 1 .5-.5H11" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" fill="none" stroke="currentColor"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 10v4M7.5 6v12M12 3v18M16.5 7v10M21 10v4" fill="none" stroke="currentColor" stroke-linecap="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" fill="none" stroke="currentColor" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <nav class="rail" aria-label="Navegação principal">
+    <a class="mark" href="#/visao" title="EchoHub · inteligência de afiliados TikTok Shop" aria-label="EchoHub, início">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M3 10v4M7.5 6v12M12 3v18M16.5 7v10M21 10v4"/></svg>
+    </a>
+    <div class="rail-group">
+      <a class="rail-item" href="#/visao" data-route="visao" aria-label="Visão geral" title="Visão geral"><svg><use href="#i-gauge"/></svg></a>
+      <a class="rail-item" href="#/produtos" data-route="produtos" aria-label="Produtos" title="Produtos"><svg><use href="#i-box"/></svg></a>
+      <a class="rail-item" href="#/nichos" data-route="nichos" aria-label="Nichos e subnichos" title="Nichos e subnichos"><svg><use href="#i-compass"/></svg></a>
+      <a class="rail-item" href="#/campanhas" data-route="campanhas" aria-label="Campanhas" title="Campanhas"><svg><use href="#i-mega"/></svg></a>
+      <a class="rail-item" href="#/ads" data-route="ads" aria-label="Playbook de Ads" title="Playbook de Ads"><svg><use href="#i-target"/></svg></a>
+      <a class="rail-item" href="#/plano" data-route="plano" aria-label="Plano 3K" title="Plano 3K"><svg><use href="#i-plan"/></svg></a>
+      <a class="rail-item" href="#/agente" data-route="agente" aria-label="Agente de vendas" title="Agente de vendas"><svg><use href="#i-chat"/></svg></a>
+    </div>
+    <div class="rail-bottom">
+      <a class="rail-item" href="#/dados" data-route="dados" aria-label="Dados e APIs" title="Dados e APIs"><svg><use href="#i-key"/></svg></a>
+      <a class="rail-item" href="#/config" data-route="config" aria-label="Configurações" title="Configurações"><svg><use href="#i-gear"/></svg></a>
+    </div>
+  </nav>
+
+  <nav class="phonebar" aria-label="Navegação">
+    <a href="#/visao" data-route="visao"><svg><use href="#i-gauge"/></svg>Visão</a>
+    <a href="#/produtos" data-route="produtos"><svg><use href="#i-box"/></svg>Produtos</a>
+    <a href="#/campanhas" data-route="campanhas"><svg><use href="#i-mega"/></svg>Campanhas</a>
+    <a href="#/agente" data-route="agente"><svg><use href="#i-chat"/></svg>Agente</a>
+    <button id="btnMore" type="button" aria-haspopup="dialog"><svg><use href="#i-grid"/></svg>Mais</button>
+  </nav>
+
+  <div class="sheet-nav" id="navSheet" role="dialog" aria-label="Todas as seções">
+    <button class="btn ghost" type="button" id="btnCloseSheet" style="justify-self:start;margin-bottom:12px"><svg><use href="#i-x"/></svg>Fechar</button>
+    <a href="#/visao" data-route="visao"><svg><use href="#i-gauge"/></svg>Visão geral</a>
+    <a href="#/produtos" data-route="produtos"><svg><use href="#i-box"/></svg>Produtos</a>
+    <a href="#/nichos" data-route="nichos"><svg><use href="#i-compass"/></svg>Nichos e subnichos</a>
+    <a href="#/campanhas" data-route="campanhas"><svg><use href="#i-mega"/></svg>Campanhas</a>
+    <a href="#/ads" data-route="ads"><svg><use href="#i-target"/></svg>Playbook de Ads</a>
+    <a href="#/plano" data-route="plano"><svg><use href="#i-plan"/></svg>Plano 3K</a>
+    <a href="#/agente" data-route="agente"><svg><use href="#i-chat"/></svg>Agente de vendas</a>
+    <a href="#/dados" data-route="dados"><svg><use href="#i-key"/></svg>Dados e APIs</a>
+    <a href="#/config" data-route="config"><svg><use href="#i-gear"/></svg>Configurações</a>
+  </div>
+
+  <main class="canvas">
+
+    <!-- ============ VISÃO GERAL ============ -->
+    <section class="view" id="view-visao" aria-labelledby="h-visao">
+      <div class="title-row">
+        <div>
+          <h1 id="h-visao">Visão geral</h1>
+          <p class="sub finding" id="findingLine"></p>
+        </div>
+        <div class="title-actions">
+          <span class="stamp"><span class="dot live"></span><span id="stampVisao">Atualizado 26/10/2026, 09:47</span></span>
+          <button class="btn ghost" type="button" data-refresh aria-label="Atualizar dados"><svg><use href="#i-refresh"/></svg>Atualizar</button>
+          <button class="btn primary" type="button" data-new-campaign><svg><use href="#i-plus"/></svg>Nova campanha</button>
+        </div>
+      </div>
+
+      <div class="sec" style="margin-top:24px">
+        <div class="kpis" id="kpiVisao"></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-head">
+          <h2>Top 10 por temperatura de vendas</h2>
+          <span class="meta">Índice EchoTok · Brasil · últimos 30 dias</span>
+        </div>
+        <div class="grid top">
+          <div class="panel span7">
+            <div class="rows" id="topTempList"></div>
+            <div class="heat-scale"><span>45°C</span><span class="seg" aria-hidden="true"></span><span class="seg" aria-hidden="true"></span><span class="seg" aria-hidden="true"></span><span>100°C</span></div>
+          </div>
+          <div class="colstack span5">
+            <div class="panel">
+              <header><h2 id="seasonTitle">Sazonalidade do produto líder</h2><span class="meta">nov/25 a dez/26</span></header>
+              <div class="chart" id="chartSeasonOverview"></div>
+              <p class="meta" style="margin-top:10px;color:var(--faint)">Traço contínuo: realizado. Traço interrompido: projeção EchoTok (Black Friday e Natal).</p>
+            </div>
+            <div class="panel">
+              <header><h2>Velocidade diária (14 dias)</h2><span class="meta" id="velocityMeta"></span></header>
+              <div class="chart" id="chartVelocityOverview"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="grid top">
+          <div class="panel span7">
+            <header><h2>Campanhas que exigem ação</h2><a class="inklink faint" href="#/campanhas">Ver campanhas</a></header>
+            <div class="rows" id="campaignQueue"></div>
+            <p class="meta" style="margin-top:12px;color:var(--faint)">A conta pausa sozinha após 3 dias abaixo do alvo; o diagnóstico usa os números da semana.</p>
+          </div>
+          <div class="panel span5">
+            <header><h2>Subnichos em aquecimento</h2><a class="inklink faint" href="#/nichos">Radar completo</a></header>
+            <div class="chart" id="chartSubnichos"></div>
+            <p class="meta" style="margin-top:10px;color:var(--faint)">Crescimento de busca e vendas em 30 dias · índice EchoTok.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PRODUTOS ============ -->
+    <section class="view" id="view-produtos" aria-labelledby="h-produtos">
+      <div class="title-row">
+        <div>
+          <h1 id="h-produtos">Produtos</h1>
+          <p class="sub" id="produtosSub">Top 10 por GMV monitorado · Brasil · últimos 30 dias</p>
+        </div>
+        <div class="title-actions">
+          <select class="input" id="fCategoria" aria-label="Filtrar por categoria">
+            <option value="">Todas as categorias</option>
+          </select>
+          <select class="input" id="fOrdem" aria-label="Ordenar por">
+            <option value="gmv">Ordenar por GMV</option>
+            <option value="temp">Ordenar por temperatura</option>
+            <option value="comissao">Ordenar por comissão (R$/un)</option>
+            <option value="growth">Ordenar por crescimento 7d</option>
+          </select>
+          <button class="btn" type="button" data-import-csv><svg><use href="#i-upload"/></svg>Importar CSV</button>
+        </div>
+      </div>
+
+      <div class="sec" style="margin-top:24px">
+        <div class="panel" style="padding:6px 20px 10px">
+          <div class="table-wrap">
+            <table class="responsive" id="tblProdutos">
+              <thead>
+                <tr>
+                  <th style="width:34px">Nº</th>
+                  <th>Produto</th>
+                  <th>Categoria</th>
+                  <th class="n">Preço</th>
+                  <th class="n">Unidades 30d</th>
+                  <th class="n">GMV 30d</th>
+                  <th class="n">Comissão</th>
+                  <th>Temperatura</th>
+                  <th class="n">7d</th>
+                  <th style="width:90px"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="meta" id="produtosTotais" style="color:var(--faint);padding:12px 2px 2px"></p>
+        </div>
+        <p class="meta" style="margin-top:12px;color:var(--faint)">Fonte: demonstração com dados simulados no formato do feed EchoTok. Conecte a Data API ou importe um CSV em Dados e APIs.</p>
+      </div>
+    </section>
+
+    <!-- ============ DETALHE DO PRODUTO ============ -->
+    <section class="view" id="view-produto" aria-labelledby="h-produto">
+      <div class="title-row">
+        <div>
+          <p class="meta" style="color:var(--faint)"><a class="inklink faint" href="#/produtos">Produtos</a> <span aria-hidden="true">/</span> <span id="crumbProduto"></span></p>
+          <h1 id="h-produto" style="font-size:22px;margin-top:4px"></h1>
+          <p class="sub" id="produtoChipLine"></p>
+        </div>
+        <div class="title-actions">
+          <select class="input" id="selProduto" aria-label="Trocar produto"></select>
+          <button class="btn" type="button" data-ask-agent><svg><use href="#i-chat"/></svg>Perguntar ao agente</button>
+          <button class="btn primary" type="button" data-new-campaign><svg><use href="#i-plus"/></svg>Criar campanha</button>
+        </div>
+      </div>
+
+      <div class="tabs" style="margin-top:24px" role="tablist" aria-label="Seções do produto">
+        <button role="tab" data-tab="desempenho" aria-selected="true">Desempenho</button>
+        <button role="tab" data-tab="qualidade" aria-selected="false">Qualidade e confiança</button>
+        <button role="tab" data-tab="angulos" aria-selected="false">Ângulos de venda</button>
+      </div>
+
+      <div id="tab-desempenho" role="tabpanel">
+        <div class="grid" style="margin-bottom:16px">
+          <div class="panel span4"><div class="bignum m" id="kGmv"></div><div class="bignum-label">GMV monitorado</div><div class="period">Últimos 30 dias · Brasil</div></div>
+          <div class="panel span4"><div class="bignum m" id="kUnidades"></div><div class="bignum-label">Unidades vendidas</div><div class="period">Últimos 30 dias</div></div>
+          <div class="panel span4"><div class="bignum m" id="kComissao"></div><div class="bignum-label">Comissão por unidade</div><div class="period" id="kComissaoNota"></div></div>
+        </div>
+        <div class="grid top">
+          <div class="panel span7">
+            <header><h2>Curva sazonal e projeção</h2><span class="meta">Índice, média do ano = 100</span></header>
+            <div class="chart" id="chartSazonal"></div>
+          </div>
+          <div class="panel span5">
+            <header><h2>Vendas diárias</h2><span class="meta">Últimos 14 dias · unidades</span></header>
+            <div class="chart" id="chartVelProduto"></div>
+            <p class="meta" style="margin-top:10px;color:var(--faint)" id="velNote"></p>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-qualidade" role="tabpanel" hidden>
+        <div class="grid top">
+          <div class="panel span4">
+            <header><h2>Satisfação dos compradores</h2></header>
+            <div class="chart" id="ringSatisfacao" style="display:flex;justify-content:center"></div>
+            <p class="meta" style="margin-top:10px;color:var(--faint)" id="satNota"></p>
+          </div>
+          <div class="panel span5">
+            <header><h2>Reclamações mais comuns</h2><span class="meta">% das reclamações</span></header>
+            <div class="chart" id="barReclamacoes"></div>
+          </div>
+          <div class="panel span3">
+            <header><h2>Confiabilidade do vendedor</h2></header>
+            <div class="kv" id="trustKv" style="gap:10px 12px"></div>
+            <p class="meta" style="margin-top:12px;color:var(--faint)" id="trustNota"></p>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-angulos" role="tabpanel" hidden>
+        <div class="grid top">
+          <div class="panel span7">
+            <header><h2>Ganchos prontos para os 2 primeiros segundos</h2><span class="meta">Regra 80/20</span></header>
+            <div class="rows" id="hooksList"></div>
+          </div>
+          <div class="panel span5">
+            <header><h2>Roteiro de 15 segundos</h2><span class="meta">estrutura recomendada</span></header>
+            <div class="rows" id="roteiroList"></div>
+            <button class="btn" type="button" data-ask-agent style="margin-top:14px"><svg><use href="#i-chat"/></svg>Personalizar com o agente</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============ NICHOS ============ -->
+    <section class="view" id="view-nichos" aria-labelledby="h-nichos">
+      <div class="title-row">
+        <div>
+          <h1 id="h-nichos">Nichos e subnichos</h1>
+          <p class="sub">Radar de demanda e concorrência no TikTok Shop Brasil · índice 0 a 100</p>
+        </div>
+        <div class="title-actions"><span class="stamp"><span class="dot live"></span>Atualizado 26/10/2026, 09:47</span></div>
+      </div>
+
+      <div class="sec" style="margin-top:24px">
+        <div class="grid top">
+          <div class="panel span7">
+            <header><h2>Tendência por nicho (12 meses)</h2><span class="meta">Índice de demanda</span></header>
+            <div class="legend" id="legendNichos" style="margin-bottom:10px"></div>
+            <div class="chart" id="chartNichos"></div>
+          </div>
+          <div class="panel span5">
+            <header><h2>Score de oportunidade</h2><span class="meta">demanda menos concorrência</span></header>
+            <div class="table-wrap">
+              <table id="tblScore" style="min-width:320px">
+                <thead><tr><th>Nicho</th><th class="n">Demanda</th><th class="n">Concorrência</th><th class="n">Score</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="grid top">
+          <div class="panel span5">
+            <header><h2>Subnichos em aquecimento</h2><span class="meta">crescimento 30d · top 5 de 8</span></header>
+            <div class="chart" id="chartSubnichosNichos"></div>
+          </div>
+          <div class="panel span7">
+            <header><h2>Como ler este radar</h2></header>
+            <div style="display:grid;gap:12px;color:var(--muted);line-height:1.5">
+              <p><strong style="color:var(--text)">Score alto com demanda média</strong> é o padrão de oceano azul: poucos criadores disputando um tema que começa a crescer. Cozinha criativa e Bem-estar estão nesse desenho neste mês.</p>
+              <p><strong style="color:var(--text)">Demanda alta com concorrência alta</strong> (Beleza) pede diferenciação de ângulo, não de produto: o mesmo sérum vende com um roteiro próprio, provas reais e a sua música como trilha.</p>
+              <p><strong style="color:var(--text)">Entrada recomendada</strong>: escolha um subnicho com crescimento acima de 40% em 30 dias e ao menos dois produtos com temperatura acima de 80°C para pegar carona na demanda que já existe.</p>
+              <p><strong style="color:var(--text)">Temperatura de 45 a 100°C</strong>: a escala compara os 10 produtos monitorados. Acima de 85°C a demanda já está provada e o risco sai do produto e vai para o criativo: se o vídeo não prender nos 2 segundos, nem produto bom vende.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CAMPANHAS ============ -->
+    <section class="view" id="view-campanhas" aria-labelledby="h-campanhas">
+      <div class="title-row">
+        <div>
+          <h1 id="h-campanhas">Campanhas</h1>
+          <p class="sub">Orgânicas e pagas em um só lugar · ROAS e ACOS calculados dos resultados da semana</p>
+        </div>
+        <div class="title-actions">
+          <button class="btn ghost" type="button" data-refresh><svg><use href="#i-refresh"/></svg>Atualizar</button>
+          <button class="btn primary" type="button" data-new-campaign><svg><use href="#i-plus"/></svg>Nova campanha</button>
+        </div>
+      </div>
+
+      <div class="sec" style="margin-top:24px">
+        <div class="kpis" id="kpiCampanhas"></div>
+      </div>
+
+      <div class="sec">
+        <div class="panel">
+          <header><h2>Proteções acionadas</h2><span class="meta">Regra: 3 dias abaixo do alvo exige pausa ou troca de criativo</span></header>
+          <div class="rows" id="guardrailList"></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="panel" style="padding:6px 20px 10px">
+          <div class="table-wrap">
+            <table class="responsive" id="tblCampanhas">
+              <thead>
+                <tr>
+                  <th>Campanha</th>
+                  <th>Plataforma</th>
+                  <th>Status</th>
+                  <th class="n">Orçamento/dia</th>
+                  <th class="n">Uso 7d</th>
+                  <th class="n">Resultado 7d</th>
+                  <th class="n">ROAS ou ACOS</th>
+                  <th style="width:170px"></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PLAYBOOK DE ADS ============ -->
+    <section class="view" id="view-ads" aria-labelledby="h-ads">
+      <div class="title-row">
+        <div>
+          <h1 id="h-ads">Playbook de Ads</h1>
+          <p class="sub">Passo a passo, campos-chave e gatilhos de otimização por plataforma</p>
+        </div>
+        <div class="title-actions">
+          <select class="input" id="selPlataforma" aria-label="Escolher plataforma"></select>
+        </div>
+      </div>
+
+      <div class="sec" style="margin-top:24px">
+        <div class="grid top">
+          <div class="panel span7">
+            <header><h2 id="adsTitulo">Passo a passo</h2><span class="meta" id="adsMeta"></span></header>
+            <ol id="adsPassos" style="display:grid;gap:10px;color:var(--muted);line-height:1.5;padding-left:0;counter-reset:passo">
+            </ol>
+            <p class="meta" style="margin-top:14px;color:var(--faint)" id="adsDica"></p>
+            <p class="meta" style="margin-top:8px;color:var(--faint)">Passos conferidos nos gerenciadores em 26/10/2026; a interface muda com frequência: se um campo sumir, procure pelo nome do objetivo.</p>
+          </div>
+          <div class="panel span5">
+            <header><h2>Campos-chave do formulário</h2></header>
+            <div class="table-wrap">
+              <table id="tblCampos" style="min-width:300px">
+                <thead><tr><th>Campo</th><th>O que preencher</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="grid top">
+          <div class="panel span7">
+            <header><h2>Gatilhos de otimização</h2><span class="meta">se acontecer, então agir</span></header>
+            <div class="rows" id="gatilhosList"></div>
+          </div>
+          <div class="panel span5">
+            <header><h2>Compliance e anti-bloqueio</h2></header>
+            <div class="rows" id="complianceList"></div>
+            <p class="meta" style="margin-top:12px;color:var(--faint)">Ignorar compliance custa mais que a campanha: conta bloqueada não vende.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PLANO 3K ============ -->
+    <section class="view" id="view-plano" aria-labelledby="h-plano">
+      <div class="title-row">
+        <div>
+          <h1 id="h-plano">Plano 3K</h1>
+          <p class="sub">Da transição de perfil musical à aprovação no programa de afiliados e às primeiras vendas</p>
+        </div>
+        <div class="title-actions"><span class="stamp" id="planoProgresso"></span></div>
+      </div>
+
+      <div class="sec" style="margin-top:24px">
+        <div class="panel">
+          <header><h2>Checklist de aprovação e posicionamento</h2><span class="meta">salvo no seu navegador</span></header>
+          <div class="rows" id="checklistPlano"></div>
+          <div style="margin-top:14px">
+            <div class="kv" style="max-width:420px"><span class="k" id="checklistLabel">0 de 8 concluídos</span></div>
+            <div style="margin-top:8px;height:8px;border-radius:4px;background:var(--well);max-width:420px"><div id="checklistBar" style="height:8px;border-radius:4px;background:var(--accent);width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="grid top">
+          <div class="panel span5">
+            <header><h2>Modelo de bio de alta conversão</h2><span class="meta">adaptar ao seu nome</span></header>
+            <div class="well" style="display:grid;gap:6px;line-height:1.5">
+              <p>Músico e produtor · testes reais de fones, microfones e luzes de estúdio</p>
+              <p>Compro, testo e digo o que NÃO vale a pena</p>
+              <p>Achadinhos com cupom e frete: link na bio</p>
+              <p style="color:var(--faint);font-size:var(--fs-small)">A música continua no centro: os vídeos de teste usam as suas faixas autorais como som oficial.</p>
+            </div>
+            <p class="meta" style="margin-top:12px;color:var(--faint)">Não abandone a audiência atual: torne-se o músico que avalia gadgets de estúdio. É o menor caminho entre os 3.000 seguidores de hoje e a primeira comissão.</p>
+            <p class="meta" style="margin-top:8px;color:var(--faint)">Trocar de bio toda semana zera o aprendizado do algoritmo: rode a mesma bio por 3 semanas antes de ajustar.</p>
+          </div>
+          <div class="panel span7">
+            <header><h2>Pareto 80/20 aplicado ao perfil</h2><span class="meta">os 20% que geram 80% do resultado</span></header>
+            <div class="rows" id="paretoList"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="grid top">
+          <div class="panel span7">
+            <header><h2>Configurações do TikTok que aumentam engajamento</h2></header>
+            <div class="rows" id="configTiktokList"></div>
+          </div>
+          <div class="panel span5">
+            <header><h2>Trilha de 30 dias</h2><span class="meta">semana a semana</span></header>
+            <div class="rows" id="trilhaList"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ AGENTE ============ -->
+    <section class="view" id="view-agente" aria-labelledby="h-agente">
+      <div class="title-row">
+        <div>
+          <h1 id="h-agente">Agente de vendas</h1>
+          <p class="sub">Responde sobre os dados desta sessão: roteiros, margens, diagnóstico de campanhas e nichos</p>
+        </div>
+        <div class="title-actions"><span class="stamp"><span class="dot"></span>Modo demonstração: respostas por regras</span></div>
+      </div>
+
+      <div class="sec" style="margin-top:24px">
+        <div class="grid top">
+          <div class="panel span8 chat">
+            <div class="well" style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+              <span style="color:var(--muted)">Contexto atual</span>
+              <span id="agentContexto" style="color:var(--text)"></span>
+            </div>
+            <div class="chat-log" id="chatLog" aria-live="polite"></div>
+            <form class="chat-form" id="chatForm">
+              <input class="input" id="chatInput" placeholder="Pergunte sobre roteiros, margens, campanhas ou nichos" autocomplete="off">
+              <button class="btn primary" type="submit">Enviar</button>
+            </form>
+          </div>
+          <div class="panel span4">
+            <header><h2>Perguntas rápidas</h2></header>
+            <div class="quick" id="quickPrompts" style="flex-direction:column;align-items:stretch">
+            </div>
+            <div style="margin-top:16px;display:grid;gap:7px;color:var(--muted)">
+              <p style="color:var(--text);font-weight:500">O que ele responde</p>
+              <p>Roteiros e ganchos para o produto selecionado</p>
+              <p>Comissão por venda e ponto de equilíbrio da verba</p>
+              <p>Diagnóstico de campanha com a regra dos 3 dias</p>
+              <p>Sazonalidade: Black Friday, Natal e datas duplas</p>
+              <p>Nichos com score de oportunidade alto</p>
+            </div>
+            <div class="notice neutral" style="margin-top:14px">Para respostas abertas com um LLM real, o prompt mestre (arquivo PROMPT_MESTRE_v3_ECHOTIK.md) descreve a ligação com a EchoTok Data API e um orquestrador LangGraph com aprovação humana antes de mexer em verba.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DADOS E APIS ============ -->
+    <section class="view" id="view-dados" aria-labelledby="h-dados">
+      <div class="title-row">
+        <div>
+          <h1 id="h-dados">Dados e APIs</h1>
+          <p class="sub">Conecte a fonte de verdade: EchoTok Data API, importação de CSV ou o feed simulado</p>
+        </div>
+      </div>
+
+      <div class="setrow" style="margin-top:12px">
+        <div>
+          <h2>Fonte de dados</h2>
+          <p class="desc">A demonstração roda sobre dados simulados. A EchoTok (echotik.live) tem Data API própria: a chave free deste MVP limita a 50 requisições por dia, a documentação fica em opendocs.echotik.live e os planos são por consumo. A chamada direta do navegador precisa de um backend próprio por causa de CORS e da chave.</p>
+        </div>
+        <div class="panel">
+          <div class="field">
+            <label>Modo de alimentação</label>
+            <div class="segmented" id="segFonte" role="group" aria-label="Modo de alimentação">
+              <button type="button" data-fonte="simulado" aria-pressed="true">Simulado</button>
+              <button type="button" data-fonte="api" aria-pressed="false">EchoTok API</button>
+              <button type="button" data-fonte="csv" aria-pressed="false">CSV importado</button>
+            </div>
+            <p class="hint" id="fonteHint"></p>
+          </div>
+          <div class="field">
+            <label>Importação real via sidecar</label>
+            <p class="hint">A chave EchoTok fica no <code>.env</code> do sidecar (<code>ECHOTOK_API_USER</code>/<code>ECHOTOK_API_PASSWORD</code>), não neste navegador. O Hub envia só o token do sidecar; a cota de 50/dia é aplicada no servidor.</p>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn primary" type="button" id="btnEchoImport">Importar 10 produtos</button>
+            <button class="btn" type="button" id="btnEchoStatus">Status e cota</button>
+            <a class="btn" href="https://opendocs.echotik.live/en" target="_blank" rel="noopener">Documentação oficial<svg><use href="#i-external"/></svg></a>
+          </div>
+          <div id="testResult" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div class="setrow">
+        <div>
+          <h2>Planos EchoTok e custo estimado</h2>
+          <p class="desc">Preços consultados na página oficial em 26/10/2026. Para uso manual, o plano Pro da interface web já cobre busca, rankings e exportação do dia a dia. A Data API vale a pena quando você quiser automatizar com o agente.</p>
+        </div>
+        <div class="panel">
+          <div class="table-wrap">
+            <table id="tblPlanos" style="min-width:480px">
+              <thead><tr><th>Plano</th><th class="n">Preço/mês (anual)</th><th>Limites que importam</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div style="margin-top:16px;display:grid;gap:12px;max-width:460px">
+            <div class="field"><label for="calcChamadas">Chamadas por dia (estimativa)</label><input class="input" id="calcChamadas" type="number" min="0" step="50" value="300"></div>
+            <div class="field"><label for="calcPreco">Preço por mil chamadas (R$, negociado com a EchoTok)</label><input class="input" id="calcPreco" type="number" min="0" step="0.5" value="5"></div>
+            <div class="well kv" style="grid-template-columns:1fr auto">
+              <span class="k">Custo mensal estimado da API</span>
+              <span class="v" id="calcResultado">R$ 45,00</span>
+            </div>
+            <p class="hint">Docs da API: custo a partir de US$ 0,001 por chamada no plano anual (cerca de R$ 5,40 por mil). Contato da API: huangshan@echosell.com · planos da interface web: massif@echotik.live.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="setrow">
+        <div>
+          <h2>API oficial do TikTok Shop</h2>
+          <p class="desc">A rota gratuita e oficial para dados de primeira mão. Exige cadastro de desenvolvedor e aprovação de app, e cobre produtos da sua conta ou de contas que autorizarem via OAuth.</p>
+        </div>
+        <div class="panel">
+          <ol style="display:grid;gap:10px;color:var(--muted);line-height:1.5;padding-left:18px">
+            <li>Cadastre-se no TikTok Shop Partner Center (partner.tiktokshop.com) como desenvolvedor.</li>
+            <li>Crie um app escolhendo a categoria "Analytics" ou "Affiliate".</li>
+            <li>Aguarde a revisão do app (2 a 7 dias úteis).</li>
+            <li>Conecte contas de vendedor/criador via OAuth 2.0 e consulte os endpoints de produtos e pedidos.</li>
+          </ol>
+          <p class="hint" style="margin-top:12px">A Open API não expõe o ranking global de vendas: para visão de mercado, o dado da EchoTok complementa a API oficial.</p>
+        </div>
+      </div>
+
+      <div class="setrow">
+        <div>
+          <h2>Importação de CSV</h2>
+          <p class="desc">Exporte da EchoTok (planos Basic em diante) ou de qualquer relatório e importe aqui. O arquivo substitui a tabela de produtos desta sessão.</p>
+        </div>
+        <div class="panel">
+          <div class="field">
+            <label for="csvFile">Arquivo CSV</label>
+            <input class="input" id="csvFile" type="file" accept=".csv,text/csv" style="max-width:340px;padding-top:6px">
+            <p class="hint">Colunas esperadas: produto,categoria,subnicho,preco,unidades30d,comissao_pct,temperatura,satisfacao. Cabeçalho na primeira linha, decimais com vírgula ou ponto.</p>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn" type="button" id="btnModeloCsv"><svg><use href="#i-download"/></svg>Baixar modelo</button>
+            <button class="btn ghost" type="button" id="btnResetCsv">Voltar aos dados simulados</button>
+          </div>
+          <div id="csvResult" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <div class="setrow">
+        <div>
+          <h2>Zona de risco</h2>
+          <p class="desc">Apaga campanhas criadas, checklist e chave guardados neste navegador. Os dados simulados voltam ao estado original.</p>
+        </div>
+        <div class="panel">
+          <button class="btn neg" type="button" id="btnLimparTudo">Apagar meus dados locais</button>
+          <p class="hint" style="margin-top:10px">A confirmação cita o que será apagado antes de executar.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ CONFIGURAÇÕES ============ -->
+    <section class="view" id="view-config" aria-labelledby="h-config">
+      <div class="title-row">
+        <div>
+          <h1 id="h-config">Configurações</h1>
+          <p class="sub">Chaves, modelos e limites dos agentes de IA e das APIs de dados desta sessão</p>
+        </div>
+        <div class="title-actions"><span class="stamp"><span class="dot"></span>Chaves guardadas só neste navegador</span></div>
+      </div>
+
+      <div class="setrow" style="margin-top:12px">
+        <div>
+          <h2>Agente sidecar (Python)</h2>
+          <p class="desc">Conecta o Hub ao sidecar <code>Tiktok_Agent_ADS</code> pelo endpoint <code>/chat</code>: SQLite + RAG + roteador de skills. A resposta traz <code>skillsUsed</code>, <code>llmProvider</code> e <code>llmModel</code>. O token é o <code>ECHOTIK_AGENT_TOKEN</code> do <code>.env</code> e fica só neste navegador.</p>
+          <div class="notice" style="margin-top:14px"><span aria-hidden="true">&#9432;</span><span>Com o sidecar desligado, o agente cai nas regras locais. Para usar o LLM real (OmniRoute/OpenRouter), inicie o sidecar antes de perguntar.</span></div>
+        </div>
+        <div class="panel">
+          <div class="cfg-row">
+            <span class="cfg-lbl" style="flex:1 1 280px"><span>URL do sidecar</span><input class="input" id="cfgSidecarUrl" placeholder="http://127.0.0.1:5077" autocomplete="off"></span>
+            <span class="cfg-lbl" style="flex:1 1 280px"><span>Token (Bearer)</span><input class="input" id="cfgSidecarToken" type="password" placeholder="ECHOTIK_AGENT_TOKEN" autocomplete="off"></span>
+          </div>
+          <div class="cfg-row">
+            <label class="cfg-lbl" style="display:flex;align-items:center;gap:8px;flex-direction:row"><input type="checkbox" id="cfgSidecarOn"> Usar o sidecar no agente</label>
+            <button class="btn" type="button" id="btnSidecarTest">Testar conexão</button>
+            <button class="btn ghost" type="button" id="btnSidecarSave">Salvar</button>
+            <span id="sidecarStatus" class="cfg-status"></span>
+          </div>
+          <p class="hint" style="margin-top:10px">Rodar: <code>uv run --frozen uvicorn echotik_agent.main:create_app --factory --host 127.0.0.1 --port 5077</code>. O teste usa <code>GET /health</code> e não envia o token para nenhum outro lugar.</p>
+        </div>
+      </div>
+
+      <div class="setrow" style="margin-top:12px">
+        <div>
+          <h2>Chaves e modelos por provedor</h2>
+          <p class="desc">Escolha o modelo pelo dropdown (grátis ou pagos, separados por tipo: chat, código, imagem, TTS e embeddings) e teste a conexão. O teste de leitura não gera texto e conta 1 chamada no contador local. Nenhuma chave sai daqui: as chamadas partem do seu navegador e alguns provedores bloqueiam por CORS; nesses casos o app mostra o comando de teste no terminal.</p>
+          <div class="notice" style="margin-top:14px"><span aria-hidden="true">&#9432;</span><span>Antes de cada teste o app consulta o contador local: se o uso do dia/mês chegar ao limite da chave free, o botão trava em vez de estourar a cota.</span></div>
+        </div>
+        <div class="panel" style="padding:0;background:var(--surface)">
+          <div id="cfgProviders"></div>
+        </div>
+      </div>
+
+      <div class="setrow">
+        <div>
+          <h2>Limites das APIs gratuitas</h2>
+          <p class="desc">Valores lidos nas documentações oficiais em 26/10/2026. O contador local registra cada chamada disparada por este app (testes e uso do agente). Quando o provedor expõe o contador real (OpenRouter, SerpAPI), ele substitui o local na última verificação.</p>
+        </div>
+        <div class="panel">
+          <div class="table-wrap">
+            <table id="tblLimites" style="min-width:560px">
+              <thead><tr><th>Provedor</th><th>Limite oficial</th><th class="n">Hoje</th><th class="n">Mês</th><th>Ajuste</th><th>Estado</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+            <button class="btn ghost" type="button" id="btnResetUso">Zerar contadores locais</button>
+            <p class="hint" style="align-self:center">Zerar não aumenta a cota do provedor: só esquece o que este navegador registrou.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="setrow">
+        <div>
+          <h2>Skills disponíveis</h2>
+          <p class="desc">Catálogo de skills estratégicas do roteador (máximo 3 por mensagem, ~1.500 tokens). Carregado do sidecar via <code>GET /skills</code>.</p>
+        </div>
+        <div class="panel">
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <button class="btn" type="button" id="btnLoadSkills">Carregar skills</button>
+            <span id="skillsCount" class="chip" style="margin-left:auto"></span>
+          </div>
+          <div id="skillsList" style="display:grid;gap:8px"></div>
+        </div>
+      </div>
+
+      <div class="setrow">
+        <div>
+          <h2>Calculadora de gastos dos LLM pagos</h2>
+          <p class="desc">Estime a conta por dia e por mês (30 dias) com os preços por 1M de tokens. Os valores vêm preenchidos das tabelas oficiais consultadas em 26/10/2026; campos editáveis para modelos com preço variável ou não verificado.</p>
+        </div>
+        <div class="panel" id="cfgCalc">
+          <div class="cfg-row">
+            <select class="input" id="cfgCalcP" aria-label="Provedor para estimar gasto"></select>
+            <select class="input" id="cfgCalcM" aria-label="Modelo para estimar gasto"></select>
+          </div>
+          <div class="cfg-row" style="margin-top:14px">
+            <span class="cfg-lbl"><span>Tokens entrada/dia</span><input class="input" id="cfgIn" type="number" min="0" step="5000" value="120000"></span>
+            <span class="cfg-lbl"><span>Tokens saída/dia</span><input class="input" id="cfgOut" type="number" min="0" step="5000" value="40000"></span>
+          </div>
+          <div class="cfg-row" style="margin-top:14px">
+            <span class="cfg-lbl"><span>US$/1M entrada</span><input class="input" id="cfgPin" type="number" min="0" step="0.01"></span>
+            <span class="cfg-lbl"><span>US$/1M saída</span><input class="input" id="cfgPout" type="number" min="0" step="0.01"></span>
+            <span class="cfg-lbl"><span>Câmbio R$/US$</span><input class="input" id="cfgFx" type="number" min="0" step="0.01" value="5.40"></span>
+          </div>
+          <div class="well kv" style="grid-template-columns:1fr auto;margin-top:14px">
+            <span class="k">Custo por dia</span>
+            <span class="v" id="cfgCalcDia" style="font-family:var(--mono)">US$ 0,00 · R$ 0,00</span>
+          </div>
+          <div class="well kv" style="grid-template-columns:1fr auto;margin-top:8px">
+            <span class="k">Custo por 30 dias</span>
+            <span class="v" id="cfgCalcMes" style="font-family:var(--mono)">US$ 0,00 · R$ 0,00</span>
+          </div>
+          <p class="hint" style="margin-top:10px" id="cfgCalcNota"></p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<dialog id="dlgCampanha" aria-labelledby="dlgTitulo">
+  <h3 id="dlgTitulo">Nova campanha</h3>
+  <p class="meta" style="color:var(--faint);margin-bottom:16px" id="dlgSub"></p>
+  <form id="formCampanha">
+    <div class="field"><label for="fcProduto">Produto</label><select class="input" id="fcProduto" style="max-width:none"></select></div>
+    <div class="field"><label for="fcPlataforma">Plataforma</label><select class="input" id="fcPlataforma" style="max-width:none"></select></div>
+    <div class="field"><label for="fcTipo">Tipo</label>
+      <div class="segmented" id="fcTipo" role="group">
+        <button type="button" data-tipo="pago" aria-pressed="true">Paga</button>
+        <button type="button" data-tipo="organico" aria-pressed="false">Orgânica</button>
+      </div>
+    </div>
+    <div class="field" id="fcBudgetField"><label for="fcBudget">Orçamento por dia (R$)</label><input class="input" id="fcBudget" type="number" min="10" step="5" value="60"><p class="hint">Comece entre R$ 30 e R$ 60 e só escale com ROAS acima do alvo por 3 dias.</p></div>
+    <div class="actions">
+      <button class="btn ghost" type="button" id="btnCancelarCampanha">Cancelar</button>
+      <button class="btn primary" type="submit">Criar campanha</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ================= DADOS =================
+   Demonstração: números simulados no formato do feed EchoTok.
+   Totais e deltas são SEMPRE calculados das linhas (nunca digitados). */
+
+const MONTHS = ['nov/25','dez/25','jan/26','fev/26','mar/26','abr/26','mai/26','jun/26','jul/26','ago/26','set/26','out/26','nov/26*','dez/26*'];
+const TODAY = 11; // out/26 é o último mês realizado; os dois seguintes são projeção
+const STAMP = '26/10/2026, 09:47';
+
+const PRODUCTS = [
+  { id:1, nome:'Fone TWS gamer Bluetooth 5.3', categoria:'Áudio & Tech', subnicho:'Fones TWS', preco:69.90, unidades30:18450, comissaoPct:20, temp:98, priorGmv:1052000, sat:0.92, stars:'4,8 de 5',
+    trust:{ prazo:'99,2%', disputas:'0,3%', rep:'Loja oficial · 2 anos' },
+    complaints:[['Entrega e logística',46],['Qualidade do material',24],['Diferente do anúncio',18],['Outros',12]],
+    sazonal:[72,88,55,48,62,45,40,52,68,84,168,150,178,162],
+    vel:[1180,1240,1310,1260,1380,1450,1520,1490,1580,1660,1720,1790,1880,1960],
+    hooks:['Testei 5 fones por menos de R$ 80 e o 3º envergonhou o de R$ 300','Gravei minha música usando este fone de R$ 70. Ouça o resultado','Por que eu larguei o fone caro depois de descobrir este'] },
+  { id:2, nome:'Calça cargo wide leg streetwear', categoria:'Moda Streetwear', subnicho:'Calças cargo', preco:119.00, unidades30:6900, comissaoPct:16, temp:58, priorGmv:862000, sat:0.86, stars:'4,4 de 5',
+    trust:{ prazo:'97,4%', disputas:'0,9%', rep:'Envio local SP' },
+    complaints:[['Entrega e logística',38],['Qualidade do material',18],['Diferente do anúncio',34],['Outros',10]],
+    sazonal:[60,52,48,50,58,62,66,60,58,70,110,96,118,104],
+    vel:[1420,1480,1450,1520,1560,1500,1580,1540,1620,1660,1700,1640,1720,1760],
+    hooks:['A calça cargo que passou no teste de 3 lavadas','Streetwear de R$ 119 que parece de R$ 300 e eu provo','Combinando 5 looks com uma única calça cargo'] },
+  { id:3, nome:'Caixa de som Bluetooth 5W à prova d\u2019água', categoria:'Áudio & Tech', subnicho:'Caixas portáteis', preco:79.90, unidades30:8900, comissaoPct:15, temp:72, priorGmv:598000, sat:0.89, stars:'4,6 de 5',
+    trust:{ prazo:'98,6%', disputas:'0,4%', rep:'Loja oficial · 1 ano' },
+    complaints:[['Entrega e logística',41],['Qualidade do material',28],['Diferente do anúncio',17],['Outros',14]],
+    sazonal:[48,60,42,38,50,44,40,46,55,68,128,150,140,158],
+    vel:[560,590,540,610,640,620,660,690,720,700,760,780,820,850],
+    hooks:['Caixa de R$ 80 à prova de praia e de churrasco: testei tudo','Coloquei minha música nessa caixinha e o vizinho pediu o link','Sobreviveu à piscina? Teste de verdade da caixa 5W'] },
+  { id:4, nome:'Microfone lapela sem fio duplo USB-C', categoria:'Áudio & Tech', subnicho:'Lapela sem fio', preco:49.90, unidades30:14200, comissaoPct:22, temp:94, priorGmv:562000, sat:0.94, stars:'4,9 de 5',
+    trust:{ prazo:'99,5%', disputas:'0,2%', rep:'Loja oficial · 2 anos' },
+    complaints:[['Entrega e logística',35],['Qualidade do material',22],['Diferente do anúncio',25],['Outros',18]],
+    sazonal:[55,48,44,50,62,58,54,60,72,88,150,132,165,148],
+    vel:[880,920,860,940,980,1020,1060,1040,1120,1180,1240,1280,1340,1420],
+    hooks:['O erro que deixa seu vídeo com cara de amador (e o R$ 50 que resolve)','Teste cego: lapela de R$ 50 contra microfone de R$ 800','Gravei um verso só com a lapela da camisa. Você acredita?'] },
+  { id:5, nome:'Sérum facial vitamina C 30ml + rotina', categoria:'Beleza & Skincare', subnicho:'Sérum e rotina', preco:39.90, unidades30:12800, comissaoPct:25, temp:86, priorGmv:448000, sat:0.91, stars:'4,7 de 5',
+    trust:{ prazo:'98,9%', disputas:'0,4%', rep:'Licenciada ANVISA' },
+    complaints:[['Entrega e logística',52],['Qualidade do material',14],['Diferente do anúncio',26],['Outros',8]],
+    sazonal:[64,70,60,58,72,66,60,64,70,78,118,104,126,112],
+    vel:[780,800,760,820,850,880,900,880,940,960,1000,1040,1080,1120],
+    hooks:['30 dias de sérum de vitamina C: o antes e depois real','Três passos de 60 segundos que troquei pela prateleira inteira','O que ninguém conta sobre sérum barato'] },
+  { id:6, nome:'Projetor galáxia para quarto', categoria:'Casa Inteligente', subnicho:'Projetores', preco:54.00, unidades30:9400, comissaoPct:18, temp:79, priorGmv:396000, sat:0.88, stars:'4,6 de 5',
+    trust:{ prazo:'98,1%', disputas:'0,6%', rep:'Envio local MG' },
+    complaints:[['Entrega e logística',44],['Qualidade do material',20],['Diferente do anúncio',26],['Outros',10]],
+    sazonal:[42,48,52,56,60,58,56,62,70,82,120,132,128,140],
+    vel:[420,450,470,440,480,500,520,510,540,560,590,620,640,660],
+    hooks:['Transformei meu quarto em planetário por menos de R$ 60','A luz que faz todo vídeo de estúdio parecer cinema','Dormi com projeção de galáxia por 7 dias: resultado'] },
+  { id:7, nome:'Luminária de mesa RGB com controle', categoria:'Casa Inteligente', subnicho:'Iluminação RGB', preco:59.90, unidades30:6400, comissaoPct:20, temp:53, priorGmv:356000, sat:0.90, stars:'4,6 de 5',
+    trust:{ prazo:'98,4%', disputas:'0,5%', rep:'Loja oficial · 1 ano' },
+    complaints:[['Entrega e logística',48],['Qualidade do material',22],['Diferente do anúncio',20],['Outros',10]],
+    sazonal:[40,44,48,50,55,52,50,55,62,74,110,120,118,128],
+    vel:[300,320,310,330,340,350,360,350,370,380,390,400,410,420],
+    hooks:['A luz de mesa que mudou minhas gravações noturnas','Testei 3 luminárias RGB: só uma valeu o dinheiro','Setup de estúdio caseiro por menos de R$ 200, parte 1'] },
+  { id:8, nome:'Tripé articulado com ring light 26 cm', categoria:'Áudio & Tech', subnicho:'Ring lights', preco:45.00, unidades30:7600, comissaoPct:19, temp:63, priorGmv:292000, sat:0.91, stars:'4,7 de 5',
+    trust:{ prazo:'99,0%', disputas:'0,3%', rep:'Loja oficial · 2 anos' },
+    complaints:[['Entrega e logística',39],['Qualidade do material',26],['Diferente do anúncio',22],['Outros',13]],
+    sazonal:[50,46,44,48,58,55,52,58,68,80,125,112,135,120],
+    vel:[380,400,390,410,420,440,460,450,470,480,500,520,540,560],
+    hooks:['Gravando 30 dias de conteúdo só com este tripé de R$ 45','O suporte que acabou com meus vídeos tremidos','Ring light + tripé: o combo que custaria R$ 300'] },
+  { id:9, nome:'Garrafa térmica 2L com marcadores de horário', categoria:'Bem-estar', subnicho:'Garrafas 2L', preco:32.50, unidades30:8100, comissaoPct:14, temp:55, priorGmv:291000, sat:0.93, stars:'4,8 de 5',
+    trust:{ prazo:'99,3%', disputas:'0,2%', rep:'Envio local RJ' },
+    complaints:[['Entrega e logística',55],['Qualidade do material',15],['Diferente do anúncio',22],['Outros',8]],
+    sazonal:[80,72,55,62,70,48,42,45,52,60,78,92,85,96],
+    vel:[620,600,640,610,590,620,600,580,560,590,570,560,540,530],
+    hooks:['Bebi 2 litros por dia com a garrafa que marca os horários','7 dias de hidratação com a garrafa viral: vale?','A garrafa que me fez largar o refri (e custa R$ 32)'] },
+  { id:10, nome:'Mini processador elétrico portátil 250 ml', categoria:'Cozinha criativa', subnicho:'Mini processadores', preco:34.90, unidades30:5800, comissaoPct:18, temp:49, priorGmv:172000, sat:0.90, stars:'4,6 de 5',
+    trust:{ prazo:'98,8%', disputas:'0,4%', rep:'Loja oficial · 1 ano' },
+    complaints:[['Entrega e logística',50],['Qualidade do material',18],['Diferente do anúncio',24],['Outros',8]],
+    sazonal:[58,62,50,48,60,52,48,52,58,66,98,108,105,112],
+    vel:[240,250,245,260,270,265,280,290,285,300,310,320,330,340],
+    hooks:['Café da manhã em 40 segundos com o mini processador','Testei o mini processador com 5 receitas: passou em 4','O gadget de R$ 35 que substitui metade da cozinha'] }
+];
+
+// campos derivados (sempre das linhas)
+for (const p of PRODUCTS) {
+  p.gmv = Math.round(p.preco * p.unidades30 * 100) / 100;
+  p.comissaoUn = Math.round(p.preco * p.comissaoPct / 100 * 100) / 100;
+  const f7 = p.vel.slice(0, 7).reduce((a, b) => a + b, 0);
+  const l7 = p.vel.slice(7).reduce((a, b) => a + b, 0);
+  p.growth7 = Math.round((l7 / f7 - 1) * 1000) / 10;
+  p.velDelta = l7 - f7;
+}
+
+const NICHES = [
+  { nome:'Áudio & Tech', demanda:78, conc:42, serie:[58,64,52,48,56,50,46,54,66,78,138,150] },
+  { nome:'Beleza & Skincare', demanda:84, conc:71, serie:[52,58,55,60,72,66,62,64,68,74,112,102] },
+  { nome:'Casa Inteligente', demanda:61, conc:38, serie:[38,42,46,50,55,52,54,60,66,76,98,108] },
+  { nome:'Moda Streetwear', demanda:66, conc:58, serie:null },
+  { nome:'Bem-estar', demanda:52, conc:27, serie:null },
+  { nome:'Cozinha criativa', demanda:44, conc:22, serie:null }
+];
+for (const n of NICHES) n.score = n.demanda - n.conc;
+const SUBNICHOS = [
+  ['Fones TWS', 142], ['Lapela sem fio', 110], ['Sérum e rotina', 85], ['Projetores', 74],
+  ['Garrafas 2L', 55], ['Calças cargo', 49], ['Ring lights', 43], ['Mini processadores', 38]
+];
+
+const DEFAULT_CAMPAIGNS = [
+  { id:'c1', nome:'Spark Ads · Fone TWS', plataforma:'TikTok Ads', tipo:'pago', produtoId:1, status:'ativa', orcDia:60, gasto7:392, receita7:1186, alvoRoas:2.0, nota:'Vídeo orgânico "Testei 5 fones" promovido' },
+  { id:'c2', nome:'GMV Max · Lapela sem fio', plataforma:'TikTok Ads', tipo:'pago', produtoId:4, status:'revisão', orcDia:40, gasto7:268, receita7:512, alvoRoas:2.0, nota:'Gancho trocado em 18/10; ROAS não recuperou' },
+  { id:'c3', nome:'Série orgânica "Estúdio caseiro"', plataforma:'TikTok (orgânico)', tipo:'organico', produtoId:4, status:'ativa', orcDia:0, gasto7:0, receita7:0, comissao7:386, nota:'3 vídeos/semana com som autoral' },
+  { id:'c4', nome:'Product Ads · Calça cargo', plataforma:'Mercado Livre', tipo:'pago', produtoId:2, status:'pausada', orcDia:30, gasto7:0, receita7:0, alvoAcos:0.12, nota:'Margem 22% não cobre ACOS-alvo após frete; pausada em 22/10' },
+  { id:'c5', nome:'Harvesting de palavras · Fone TWS', plataforma:'Amazon Ads', tipo:'pago', produtoId:1, status:'rascunho', orcDia:50, gasto7:0, receita7:0, alvoAcos:0.18, nota:'Campanha automática para descobrir termos; negativar após 15 cliques sem venda' },
+  { id:'c6', nome:'Shopee Video · Garrafa 2L', plataforma:'Shopee', tipo:'pago', produtoId:9, status:'ativa', orcDia:25, gasto7:158, receita7:655, alvoRoas:3.0, nota:'Sub_ID 05; dobra lance nas datas duplas' },
+  { id:'c7', nome:'Partnership Reels · Sérum', plataforma:'Meta Ads', tipo:'pago', produtoId:5, status:'ativa', orcDia:80, gasto7:524, receita7:968, alvoRoas:2.0, nota:'Frequência 3,1: risco de fadiga de criativo' }
+];
+for (const c of DEFAULT_CAMPAIGNS) {
+  if (c.tipo === 'pago' && c.gasto7 > 0) {
+    c.roas = Math.round(c.receita7 / c.gasto7 * 100) / 100;
+    if (c.alvoRoas) c.vsAlvo = Math.round((c.roas - c.alvoRoas) * 100) / 100;
+    if (c.alvoAcos) c.acos = Math.round(c.gasto7 / c.receita7 * 1000) / 10;
+  }
+  if (c.orcDia > 0) { c.orc7 = c.orcDia * 7; c.usoPct = Math.round(c.gasto7 / c.orc7 * 100); }
+}
+
+const ADS = {
+  'TikTok Ads': {
+    meta:'Spark Ads e GMV Max · o criativo é o seu vídeo orgânico com a sacolinha amarela',
+    dica:'Promova o vídeo orgânico que já reteve melhor nos 3 segundos, não o último que você postou.',
+    passos:[
+      'Crie o Business Center em ads.tiktok.com e vincule o perfil do criador.',
+      'Instale o Pixel e os eventos de compra (o Spark Ads mede a sacolinha do vídeo orgânico).',
+      'Promova o vídeo orgânico como Spark Ad: o vídeo ganha plays e o produto ganha vendas com o mesmo criativo.',
+      'Campanha com objetivo "Vendas no site" ou GMV Max (TikTok Shop); orçamento de teste de R$ 30 a R$ 60/dia.',
+      'Na primeira semana, bloqueie a rede Pangle (display de terceiros) para concentrar o aprendizado no For You.',
+      'Publique 3 anúncios por grupo com ganchos diferentes e deixe o algoritmo escolher o vencedor.'
+    ],
+    campos:[['Objetivo','GMV Max para TikTok Shop; Vendas no site para bridge page'],['Otimização','Compra concluída (nunca clique)'],['Orçamento','R$ 60/dia de teste; escale 20% a cada 3 dias de ROAS ok'],['Local e público','Brasil, 18-40, interesse amplo, sem micro-segmentar'],['Criativo','Spark Ad: o vídeo orgânico com a sua música de fundo']],
+    gatilhos:[['CTR abaixo de 1,5% após 3.000 impressões','Trocar o gancho dos 2 primeiros segundos; manter o corpo do vídeo'],['Hook rate abaixo de 30% (retenção de 3s)','Regravar a abertura, sem mexer no roteiro inteiro'],['ROAS abaixo do alvo por 3 dias','Pausar o pior anúncio do grupo, não o grupo inteiro'],['CPM acima de 2x a meta','Reduzir lance em 20% antes de mexer no público']],
+    compliance:['Declare a relação de afiliado na legenda quando houver comissão.','Sem alegações médicas ("cura", "trata"): o TikTok reprova e pode bloquear a conta.','A música usada nos anúncios precisa ser sua (biblioteca comercial não vale para Spark Ads ligado à sua conta).','A revisão de anúncio leva até 24h: não reenvie o mesmo criativo em loop, isso estende a fila.']
+  },
+  'Mercado Livre': {
+    meta:'Product Ads e Mercado Ads Clips · a régua é a margem de contribuição',
+    dica:'Desligue anúncios quando o estoque cair: anúncio em ruptura penaliza a conta e a reputação.',
+    passos:[
+      'Ative a Central de Anúncios no painel do vendedor (exige reputação verde e estoque).',
+      'Separe campanhas por margem de contribuição: nunca anuncie item com margem abaixo do ACOS-alvo.',
+      'Crie uma campanha de Descoberta (automática) para mapear termos por 2 semanas.',
+      'Migre os termos vencedores para campanha de Competitividade com lances próprios.',
+      'Reaproveite os vídeos verticais do TikTok no Mercado Ads Clips, sem marca d\u2019água.',
+      'Meta de ACOS de 10% a 14% em catálogo maduro; até 20% em lançamento.'
+    ],
+    campos:[['Tipo','Product Ads (Descoberta + Competitividade)'],['ACOS-alvo','12% em catálogo; 20% em lançamento'],['Orçamento','R$ 30/dia por campanha; consolide quando ganhar tração'],['Estoque','Exigir fulfillment (Full) antes de anunciar'],['Clipes','Mesmo vídeo vertical do TikTok, re-editado']],
+    gatilhos:[['ACOS acima da meta por 5 dias','Pausar o termo, não a campanha'],['Estoque para menos de 2 semanas','Reduzir lance em 30% para não queimar Anúncio em ruptura'],['Posição 1 com ACOS 2x a meta','Descer para posição 2-3 e re-avaliar em 7 dias'],['Vendas caem com CTR estável','Checar preço, frete e avaliações antes de mexer no anúncio']],
+    compliance:['Sem reputação verde o anúncio rende menos e o frete come a margem.','Anunciar item sem estoque gera penalização na conta de anúncios.']
+  },
+  'Amazon Ads': {
+    meta:'Sponsored Products e Sponsored Brands Video · primeiro descobrir, depois escalar',
+    dica:'Harvest primeiro (campanha automática), escala depois (manual exact): nunca os dois no mesmo orçamento no começo.',
+    passos:[
+      'Crie uma campanha automática (keyword harvesting) com orçamento de R$ 50/dia.',
+      'Após 2 semanas, exporte o relatório de termos de pesquisa e marque os campeões.',
+      'Crie campanha manual Exact com os campeões e lances para Top of Search (+30% a +50%).',
+      'Negativar termos com 15 cliques sem venda.',
+      'Publique Sponsored Brands Video com o vídeo vertical do TikTok, sem marca d\u2019água.',
+      'Defenda a marca: lanche na própria palavra-chave para proteger a página de roubos de buy box.'
+    ],
+    campos:[['Formato','SP (busca) e SBV (vídeo)'],['Correspondência','Auto para descobrir; Exact para escalar'],['Lance Top of Search','+30% sobre o lance base nos campeões'],['Orçamento','R$ 50/dia; dividir 70% Exact / 30% Auto'],['ASIN','Manter estoque e preço competitivo: o Buy Box exige']],
+    gatilhos:[['15 cliques sem venda','Negativar o termo na campanha manual e na automática'],['ACOS acima de 25% em Exact','Reduzir lance 10% e re-avaliar em 5 dias'],['Impressão share abaixo de 30%','Aumentar orçamento antes de subir lance'],['Apareceu em termo sem relação','Negativar imediatamente (protege relevância)']],
+    compliance:['Vídeo de anúncio não pode exibir logotipo do TikTok ou marca d\u2019água de outra rede.','Página de afiliado deve deixar clara a relação de afiliação nas políticas do programa.']
+  },
+  'Shopee': {
+    meta:'GMV Max, Descoberta e Shopee Video · rastreie cada criativo com Sub_ID',
+    dica:'Um Sub_ID por criativo, sempre. Sem isso você nunca sabe qual vídeo gerou o pedido.',
+    passos:[
+      'Ative o novo centro de anúncios (GMV Max) ou Anúncios de Descoberta no painel.',
+      'Campanha de busca com os termos da categoria (ex.: "garrafa 2 litros").',
+      'Crie um Sub_ID por criativo para saber qual vídeo vendeu (essencial para afiliados).',
+      'Dobre o orçamento nas datas duplas (10.10, 11.11, 12.12) e nos dias de pagamento (5, 15 e 30).',
+      'Publique Shopee Video e Live com o mesmo criativo do TikTok, re-editado e sem marca d\u2019água.'
+    ],
+    campos:[['Tipo','Busca (terms) + Descoberta (descoberta automática)'],['Sub_ID','Um código por vídeo: sh05-lapela, sh05-garrafa...'],['Multiplicador de lance','2x nas datas duplas e dias de pagamento'],['Orçamento','R$ 25/dia base; R$ 50 em janela promocional'],['Vídeo','9:16, primeiros 2s mostrando o produto em uso']],
+    gatilhos:[['CTR da palavra abaixo de 1%','Trocar a palavra por uma de cauda longa'],['ROAS 3x acima da meta','Dobrar orçamento por 3 dias e re-avaliar'],['Vendas caem entre os dias 20 e 28','Reduzir 30% até o dia 3 do mês seguinte'],['Cupom da campanha oficial expira','Pausar criativos que citam o cupom']],
+    compliance:['Sincronize os cupons com a campanha oficial da Shopee: cupom desalinhado gera reclamação e queda de nota.','Vídeos re-editados: remova qualquer marca d\u2019água de outra rede.']
+  },
+  'Temu (afiliado)': {
+    meta:'Arbitragem de EPC por cliques · só anuncie quando o EPC paga o CPC',
+    dica:'Confira o preço no dia da postagem: o catálogo do Temu muda toda semana e vídeo com preço errado destrói confiança.',
+    passos:[
+      'Cadastre-se no programa de afiliados do Temu e anote o EPC médio por categoria.',
+      'Priorize itens com armazém local no Brasil (frete rápido reduz objeção e reembolso).',
+      'Regra da arbitragem: só coloque tráfego pago se o EPC for maior que 2x o CPC que você paga.',
+      'Construa uma página-ponte própria com o cupom imediato (sem promessa falsa de preço).',
+      'Produza vídeos de "achadinho" com preço real: o preço do Temu muda com frequência.'
+    ],
+    campos:[['Canal','Programa de afiliados (comissão por pedido)'],['Produto','EPC acima de R$ 0,40 e avaliação acima de 4,3'],['Armazém','Local (BR) sempre que existir'],['Cupom','Cupom vigente conferido no dia da postagem'],['Link','Página-ponte própria ou link direto do app']],
+    gatilhos:[['EPC caiu 30% em 7 dias','Trocar de produto: o ciclo do Temu é curto'],['Cupom expirou','Pausar o anúncio no mesmo dia'],['Devolução do produto acima de 8%','Sair do produto e avisar a audiência'],['Preço subiu no vídeo','Regravar a cena do preço ou trocar para "a partir de"']],
+    compliance:['Nunca prometa preço fixo em vídeo: use "a partir de".','Página-ponte precisa revelar a relação de afiliado e o preço real.']
+  },
+  'Meta Ads': {
+    meta:'Advantage+ Shopping e Partnership Ads · estrutura consolidada, sem micro-segmentação',
+    dica:'Comece com o Advantage+ ligado; só crie públicos manuais se o CPM estagnar por duas semanas.',
+    passos:[
+      'Monte Business Manager, Pixel e API de Conversões (CAPI) no domínio da página de destino.',
+      'Campanha Advantage+ Shopping com catálogo e orçamento consolidado.',
+      'Use Partnership Ads: autorize o perfil de criador (no seu caso, o seu próprio perfil) para o anúncio sair no seu nome.',
+      'Reels 9:16 com a sua música autoral (música de terceiros barra a conta de anúncios).',
+      'Rode 3 criativos por conjunto e evite públicos sobrepostos: o Andromeda faz a segmentação.'
+    ],
+    campos:[['Objetivo','Vendas (purchase) com otimização em conversão'],['Vantagem+','Ligado; orçamento consolidado por campanha'],['Público','Amplo, apenas restrições de idade e local'],['Colocação','Reels e Feed; Stories só com layout próprio'],['Medição','Pixel + CAPI com evento de compra deduplicado']],
+    gatilhos:[['Frequência acima de 2,8 em 7 dias','Trocar o criativo: público saturado'],['CPM subiu 40% sem mudança de leilão','Checar sobreposição de públicos e consolidar'],['ROAS cai com CTR estável','O problema é a página de destino, não o anúncio'],['Aprovação pendente acima de 24h','Revisar política de categoria (beleza é sensível)']],
+    compliance:['Só música autoral ou biblioteca livre de direitos: a lei de anúncios do Meta é mais dura que o feed.','Parceria com criador exige tag "Patrocinado" e autorização formal.']
+  },
+  'Google Ads': {
+    meta:'Performance Max, Search de fundo de funil e Demand Gen · capture a demanda que o TikTok criou',
+    dica:'Negativar termos em lote toda segunda-feira vale mais do que qualquer ajuste fino de lance.',
+    passos:[
+      'Vincule o Merchant Center (se tiver loja) ou use Demand Gen para página de afiliado.',
+      'Performance Max com feed de produtos e sinal de público da sua lista.',
+      'Rede de Pesquisa de fundo de funil: "[produto] vale a pena", "review [produto]".',
+      'Demand Gen com o vídeo vertical no YouTube Shorts (mesmo criativo do TikTok).',
+      'Bloqueie lances na marca própria (anti-brand bidding) para não queimar verba de descoberta.'
+    ],
+    campos:[['Tipo','PMax (catálogo), Search (intenção), Demand Gen (descoberta)'],['Palavras negativas','Lista central: "grátis", "como fazer", termos sem intenção de compra'],['Lance','tROAS de 250% em PMax; CPC manual em Search de teste'],['Orçamento','R$ 40/dia divididos 60% PMax / 40% Search'],['Extensões','Sitelinks com review e comparativo']],
+    gatilhos:[['Termo irrelevante no relatório semanal','Negativar em lote toda segunda-feira'],['CPC subiu com posição estável','Melhore o índice de qualidade do anúncio (texto e página)'],['Demand Gen com CPA 2x a meta','Trocar a thumbnail e o gancho, não o público'],['PMax misturando marca e genérico','Separar ativo de exclusão de marca']],
+    compliance:['A página de destino precisa revelar a relação de afiliado (política de transparência).','Sem usar o nome oficial da marca no domínio ou no título como se fosse a loja oficial.']
+  }
+};
+
+const PLANO = {
+  checklist:[
+    'Mudar para conta corporativa no TikTok Studio',
+    'Liberar duetos e costuras nas configurações de privacidade',
+    'Cadastrar CPF e chave Pix no TikTok Seller Center',
+    'Vincular o perfil atual como conta oficial de marketing',
+    'Publicar 5 vídeos com a nova bio antes de pedir aprovação',
+    'Ler as regras de conteúdo da sacolinha amarela (evitar ban)',
+    'Configurar o link de achadinhos na bio',
+    'Publicar o primeiro vídeo de produto com música autoral'
+  ],
+  pareto:[
+    ['O gancho dos 2 segundos','Metade do esforço de roteiro vai na abertura. Exemplo: "Eu quase joguei meu microfone fora até achar este fone de R$ 60."'],
+    ['Sua música como som oficial','O review usa a sua faixa autoral. O vídeo do produto viraliza e a música viraliza junto na aba de sons.'],
+    ['Resposta em vídeo aos comentários','Quando perguntarem "onde compro", responda com um vídeo novo. O TikTok prioriza esse formato na distribuição.'],
+    ['Uma única chamada para ação','Peça uma coisa só: "clica na sacolinha amarela". Pedir curtir, seguir e comprar junto derruba a conversão.']
+  ],
+  configTiktok:[
+    'Conta corporativa ativada (libera TikTok Studio e métricas)',
+    'Dueto e costura liberados (multiplica alcance orgânico)',
+    'Upload em HD ativado (retenção cai com vídeo comprimido)',
+    'Adesivo de enquete nos primeiros 30 minutos (força micro-interação)',
+    'Respondedor de comentários em vídeo ativado'
+  ],
+  trilha:[
+    ['Semana 1','Reposicionamento: bio nova e 3 vídeos de teste com música autoral'],
+    ['Semana 2','Aprovação: Seller Center, vínculo de conta e primeiro vídeo com a sacolinha'],
+    ['Semana 3','Orgânico focado: 2 produtos com temperatura acima de 80°C, 5 vídeos'],
+    ['Semana 4','Primeiro teste pago: R$ 30 a 60/dia em Spark Ads do vídeo que melhor reteve']
+  ]
+};
+
+const PLANOSECHOTOK = [
+  ['Free', 0, 'Rankings diários (top 100), histórico de 30 dias, busca limitada'],
+  ['Basic', 9.90, 'Top 100, 100 detalhes/dia, 100 exportações/dia, histórico de 30 dias'],
+  ['Pro', 19.10, 'Top 1.000, 1.000 detalhes/dia, 2.000 exportações/dia, histórico de 90 dias, monitor de live e produto'],
+  ['Enterprise', 29.10, 'Bibliotecas ilimitadas, 60 mil exportações de produtos/dia, histórico sem limite, 5.000 buscas/dia']
+];
+</script>
+
+<script src="charts.js"></script>
+<script>
+/* ================= LÓGICA (1/2): helpers, estado, router, visão/produtos/produto/nichos ================= */
+'use strict';
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+
+/* formatadores pt-BR */
+const nfInt = new Intl.NumberFormat('pt-BR');
+const nfBRL0 = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+const nfBRL2 = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const nfX = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const nfN1 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtBRL = (v) => nfBRL0.format(Math.round(v));
+const fmtBRL2 = (v) => nfBRL2.format(v);
+const fmtInt = (v) => nfInt.format(Math.round(v));
+const fmtMi = (v) => 'R$ ' + new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v / 1e6) + ' mi';
+const fmtPct = (v, d = 1) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(v) + '%';
+const fmtNum1 = (v) => nfN1.format(v);
+const signed = (f) => (v) => (v > 0 ? '+' : v < 0 ? '\u2212' : '') + f(Math.abs(v));
+const fmtSigned = signed(fmtPct);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const kpiHTML = (label, value, delta, lead) =>
+  `<div class="kpi"><div class="kpi-label">${label}</div><div class="kpi-value m${lead ? ' lead' : ''}">${value}</div>${delta ? `<div class="delta">${delta}</div>` : ''}</div>`;
+const pillHTML = (cls, txt) => `<span class="pill${cls ? ' ' + cls : ''}"><span class="dotm"></span>${txt}</span>`;
+const tempHTML = (t) =>
+  `<span class="temp${t >= 85 ? ' t-hot' : t >= 60 ? ' t-warm' : ''}"><span class="meter"><i style="width:${t}%"></i></span><span class="val">${t}\u00B0C</span></span>`;
+const noticeHTML = (kind, msg) => `<div class="notice${kind === 'pos' ? ' positive' : kind === 'neutral' ? ' neutral' : ''}">${msg}</div>`;
+
+/* ---------- estado (o que o usuário alterou fica no localStorage) ---------- */
+const LS = 'echohub';
+const products = PRODUCTS; /* referência mutável: o CSV substitui o conteúdo */
+const defaults = JSON.parse(JSON.stringify(PRODUCTS)); /* cópia para restaurar */
+
+/* ---------- configurações: provedores, modelos e limites (docs oficiais, 26/10/2026) ---------- */
+const CFG_PROVIDERS = [
+  { id: 'openrouter', nome: 'OpenRouter', kind: 'llm', badge: 'modelos :free', prefixo: 'sk-or-', test: 'openrouter',
+    limiteDia: 50, notaLimite: '20/min e 50/dia em :free (1.000/dia com 10+ créditos)',
+    nota: 'Catálogo carregado ao vivo de openrouter.ai/api/v1/models (não precisa de chave). O teste lê o contador real da chave (GET /api/v1/key).',
+    doc: 'https://openrouter.ai/docs/api-reference/limits' },
+  { id: 'gemini', nome: 'Google Gemini', kind: 'llm', badge: 'free em Flash e TTS', prefixo: 'AIza', test: 'gemini',
+    limiteDia: 250, notaLimite: 'free por modelo; RPM/RPD por modelo (AI Studio)',
+    nota: 'Flash, Flash-Lite, TTS e transcrição têm camada grátis. RPM/RPD variam por modelo: confira no AI Studio. O limite local de 250/dia é editável na tabela de limites.',
+    doc: 'https://ai.google.dev/gemini-api/docs/rate-limits' },
+  { id: 'omnirouter', nome: 'OmniRouter', kind: 'llm', badge: 'OpenAI-compatível', test: 'compat', basePadrao: 'http://localhost:20128/v1',
+    limiteDia: 0, notaLimite: 'conforme o painel do provedor',
+    nota: 'Servidor OmniRoute local (porta 20128). Combos reais: auto/best-free, auto/best-coding, auto/best-fast, auto/best-reasoning, auto/best-vision. Inicie o OmniRoute antes de testar; o endpoint é editável abaixo.',
+    doc: 'http://localhost:20128' },
+  { id: 'claude', nome: 'Claude (Anthropic)', kind: 'llm', badge: 'pago por uso', prefixo: 'sk-ant-', test: 'anthropic',
+    limiteDia: 0, notaLimite: 'sem camada grátis (pay-as-you-go)',
+    nota: 'O teste lista modelos via GET /v1/models (não gera texto). IDs e preços conferidos em 26/10/2026.',
+    doc: 'https://platform.claude.com/docs/en/about-claude/pricing' },
+  { id: 'deepseek', nome: 'DeepSeek', kind: 'llm', badge: 'pago por uso', prefixo: 'sk-', test: 'compat', basePadrao: 'https://api.deepseek.com',
+    limiteDia: 0, notaLimite: 'sem camada grátis (pay-as-you-go)',
+    nota: 'API compatível com OpenAI. Modelos atuais nos docs: deepseek-flash e deepseek-v4-pro. Preço por 1M tokens não verificado hoje: confirme no platform.deepseek.com.',
+    doc: 'https://api-docs.deepseek.com/quick_start/pricing' },
+  { id: 'openai', nome: 'OpenAI', kind: 'llm', badge: 'pago por uso', prefixo: 'sk-', test: 'openai',
+    limiteDia: 0, notaLimite: 'sem camada grátis (pay-as-you-go)',
+    nota: 'Pay-as-you-go. O teste lista modelos via GET /v1/models; se o navegador bloquear por CORS, use o comando do terminal.',
+    doc: 'https://developers.openai.com/api/docs/pricing' },
+  { id: 'serpapi', nome: 'SerpAPI', kind: 'dados', badge: '250 buscas/mês', test: 'serp',
+    limiteMes: 250, limiteHora: 50, notaLimite: 'Free: 250/mês e 50/hora',
+    nota: 'Pesquisa web para o agente (tendências, SERPs de produto). O teste lê account.json e traz o saldo real do mês. Erros e buscas em cache não contam no plano deles.',
+    doc: 'https://serpapi.com/pricing' },
+  { id: 'echotok', nome: 'EchoTok Data API', kind: 'dados', badge: 'via sidecar', test: 'echotok', sidecarOnly: true,
+    limiteDia: 50, notaLimite: '50 requisições/dia (chave free, MVP)',
+    nota: 'A chave fica no .env do sidecar (ECHOTOK_API_USER/ECHOTOK_API_PASSWORD ou ECHOTOK_API_KEY), nunca neste navegador. O teste consulta /echotok/status e mostra a cota real do dia; o limite de 50/dia é aplicado no servidor. Docs: opendocs.echotik.live.',
+    doc: 'https://opendocs.echotik.live/en' },
+];
+
+/* modelos por provedor: IDs e preços por 1M de tokens (US$) das tabelas oficiais, consultados em 26/10/2026 */
+const LLM_MODELS = [
+  { p: 'gemini', id: 'gemini-3.8-flash', nome: 'Gemini 3.8 Flash', tipo: 'chat', custo: 'gratis', pin: 0.75, pout: 3.75, nota: 'pago: 0,75/3,75 até 31/12/2026 (depois 1,50/7,50)' },
+  { p: 'gemini', id: 'gemini-3.6-flash', nome: 'Gemini 3.6 Flash', tipo: 'chat', custo: 'gratis', pin: 0.75, pout: 3.75, nota: 'pago: 0,75/3,75 até 31/12/2026' },
+  { p: 'gemini', id: 'gemini-3.5-flash-lite', nome: 'Gemini 3.5 Flash-Lite', tipo: 'chat', custo: 'gratis', pin: 0.30, pout: 2.50 },
+  { p: 'gemini', id: 'gemini-3.1-flash-lite', nome: 'Gemini 3.1 Flash-Lite', tipo: 'chat', custo: 'gratis', pin: 0.25, pout: 1.50 },
+  { p: 'gemini', id: 'gemini-3.1-pro-preview', nome: 'Gemini 3.1 Pro (preview)', tipo: 'codigo', custo: 'pago', pin: 2.00, pout: 12.00, nota: 'sem free; preço de prompts com até 200k' },
+  { p: 'gemini', id: 'gemini-4-argon', nome: 'Gemini 4 Argon', tipo: 'codigo', custo: 'pago', pin: 2.00, pout: 10.00, nota: 'sem free; intro de 2,00/10,00 até 30/11/2026 (depois 4,00/20,00)' },
+  { p: 'gemini', id: 'gemini-3.8-flash-tts', nome: 'Gemini 3.8 Flash TTS', tipo: 'tts', custo: 'gratis', pin: 0.50, pout: 9.00, nota: 'pago: 0,50 texto / 9,00 áudio até 31/12/2026' },
+  { p: 'gemini', id: 'gemini-nano-banana-2.1', nome: 'Nano Banana 2.1 (imagem)', tipo: 'imagem', custo: 'pago', pin: 1.50, pout: 30.00, nota: 'saída de imagem equivale a US$ 0,034 por imagem 1K' },
+  { p: 'gemini', id: 'gemini-3.1-flash-image', nome: 'Nano Banana 2 (imagem)', tipo: 'imagem', custo: 'pago', pin: 0.50, pout: 60.00, nota: 'saída de imagem equivale a US$ 0,067 por imagem 1K' },
+  { p: 'gemini', id: 'gemini-embedding', nome: 'Gemini Embedding', tipo: 'embedding', custo: 'pago', pin: 0, pout: 0, nota: 'preço não verificado hoje: confirme' },
+  { p: 'claude', id: 'claude-haiku-5-5', nome: 'Claude Haiku 5.5 (prompts de até 100k)', tipo: 'chat', custo: 'pago', pin: 0.10, pout: 0.50 },
+  { p: 'claude', id: 'claude-sonnet-5-5', nome: 'Claude Sonnet 5.5', tipo: 'codigo', custo: 'pago', pin: 2.00, pout: 10.00 },
+  { p: 'claude', id: 'claude-opus-5-5', nome: 'Claude Opus 5.5', tipo: 'codigo', custo: 'pago', pin: 4.00, pout: 20.00 },
+  { p: 'claude', id: 'claude-fable-5-1', nome: 'Claude Fable 5.1', tipo: 'codigo', custo: 'pago', pin: 10.00, pout: 50.00 },
+  { p: 'deepseek', id: 'deepseek-flash', nome: 'DeepSeek Flash (V4.1)', tipo: 'chat', custo: 'pago', pin: 0, pout: 0, nota: 'preço não verificado hoje: confirme' },
+  { p: 'deepseek', id: 'deepseek-v4-pro', nome: 'DeepSeek V4 Pro', tipo: 'codigo', custo: 'pago', pin: 0, pout: 0, nota: 'preço não verificado hoje: confirme' },
+  { p: 'openai', id: 'gpt-6-luna', nome: 'GPT-6 Luna', tipo: 'chat', custo: 'pago', pin: 0.10, pout: 0.50 },
+  { p: 'openai', id: 'gpt-5.4-mini', nome: 'GPT-5.4 Mini', tipo: 'chat', custo: 'pago', pin: 0.75, pout: 4.50 },
+  { p: 'openai', id: 'gpt-5.1', nome: 'GPT-5.1', tipo: 'chat', custo: 'pago', pin: 1.25, pout: 10.00 },
+  { p: 'openai', id: 'gpt-6.1-sol', nome: 'GPT-6.1 Sol', tipo: 'codigo', custo: 'pago', pin: 2.00, pout: 10.00 },
+  { p: 'openai', id: 'gpt-5.3-codex', nome: 'GPT-5.3 Codex', tipo: 'codigo', custo: 'pago', pin: 1.75, pout: 14.00 },
+  { p: 'openai', id: 'gpt-image-2', nome: 'GPT Image 2', tipo: 'imagem', custo: 'pago', pin: 5.00, pout: 30.00, nota: 'texto 5,00 / imagem 30,00 por 1M' },
+  { p: 'openai', id: 'gpt-4o-mini-tts', nome: 'GPT-4o Mini TTS', tipo: 'tts', custo: 'pago', pin: 0.60, pout: 12.00 },
+  { p: 'openai', id: 'text-embedding-3-small', nome: 'Embeddings 3 Small', tipo: 'embedding', custo: 'pago', pin: 0.02, pout: 0 },
+];
+let OR_MODELS = []; /* catálogo do OpenRouter carregado ao vivo (GET /api/v1/models, sem chave) */
+const CURL_HINT = {
+  openrouter: 'curl -H "Authorization: Bearer YOUR_API_KEY" https://openrouter.ai/api/v1/key',
+  gemini: 'curl "https://generativelanguage.googleapis.com/v1beta/models?key=YOUR_API_KEY"',
+  openai: 'curl -H "Authorization: Bearer YOUR_API_KEY" https://api.openai.com/v1/models',
+  claude: 'curl -H "x-api-key: YOUR_API_KEY" -H "anthropic-version: 2023-06-01" https://api.anthropic.com/v1/models',
+  deepseek: 'curl -H "Authorization: Bearer YOUR_API_KEY" https://api.deepseek.com/models',
+  omnirouter: 'curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:20128/v1/models',
+  serpapi: 'curl "https://serpapi.com/account.json?api_key=YOUR_API_KEY"',
+};
+const cfgDefault = () => ({
+  keys: {}, sel: {}, custom: {}, filtros: {}, uso: {}, real: {}, st: {}, limiteCustom: {}, base: {},
+  fx: 5.4, calc: { p: 'gemini', m: 'gemini-3.8-flash' },
+  sidecar: { url: 'http://127.0.0.1:5077', token: '', on: true },
+});
+
+const state = {
+  selected: 1,
+  fonte: 'simulado',
+  config: cfgDefault(),
+  checklist: PLANO.checklist.map(() => false),
+  campaigns: DEFAULT_CAMPAIGNS.map((c) => ({ ...c })),
+  categoria: '', ordem: 'gmv', tab: 'desempenho', plataforma: 'TikTok Ads',
+  stamp: STAMP,
+};
+
+function persist() {
+  try {
+    localStorage.setItem(LS, JSON.stringify({ fonte: state.fonte, produtos: products, checklist: state.checklist, campaigns: state.campaigns, selected: state.selected, config: state.config }));
+  } catch (e) { /* localStorage cheio ou bloqueado: segue sem persistir */ }
+}
+function restore() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS) || 'null');
+    if (!raw) return;
+    // Migração de segurança: a chave EchoTok agora vive no .env do sidecar.
+    if (Object.prototype.hasOwnProperty.call(raw, 'apiKey')) {
+      delete raw.apiKey;
+      try { localStorage.setItem(LS, JSON.stringify(raw)); } catch (e) { /* segue */ }
+    }
+    if (raw.config && typeof raw.config === 'object') {
+      const d = cfgDefault();
+      state.config = { ...d, ...raw.config };
+      state.config.calc = { ...d.calc, ...(raw.config.calc || {}) };
+      state.config.sidecar = { ...d.sidecar, ...(raw.config.sidecar || {}) };
+    }
+    if (Array.isArray(raw.produtos) && raw.produtos.length && raw.produtos.every((p) => p && p.id != null && p.nome)) {
+      products.length = 0;
+      products.push(...raw.produtos);
+      recomputarProdutos();
+      if (raw.fonte === 'api' || raw.fonte === 'csv' || raw.fonte === 'simulado') state.fonte = raw.fonte;
+    } else {
+      // Fonte importada sem produtos salvos não é uma fonte válida.
+      state.fonte = 'simulado';
+    }
+    if (Array.isArray(raw.checklist)) {
+      state.checklist = raw.checklist.slice(0, PLANO.checklist.length).map(Boolean);
+      while (state.checklist.length < PLANO.checklist.length) state.checklist.push(false);
+    }
+    if (Array.isArray(raw.campaigns) && raw.campaigns.length) state.campaigns = raw.campaigns;
+    if (raw.selected && products.some((p) => p.id === raw.selected)) state.selected = raw.selected;
+  } catch (e) { /* estado corrompido: segue com o padrão */ }
+}
+
+const sel = () => products.find((p) => p.id === state.selected) || products[0];
+const agg = () => {
+  const gmv = products.reduce((a, p) => a + p.gmv, 0);
+  const unidades = products.reduce((a, p) => a + p.unidades30, 0);
+  const comissao = products.reduce((a, p) => a + p.comissaoUn * p.unidades30, 0);
+  const f7 = products.reduce((a, p) => a + (p.vel ? p.vel.slice(0, 7).reduce((x, y) => x + y, 0) : 0), 0);
+  const l7 = products.reduce((a, p) => a + (p.vel ? p.vel.slice(7).reduce((x, y) => x + y, 0) : 0), 0);
+  return { gmv, unidades, comissao, comissaoMedia: comissao / Math.max(1, unidades), growth: Math.round((l7 / Math.max(1, f7) - 1) * 1000) / 10 };
+};
+const campAgg = () => {
+  const pagas = state.campaigns.filter((c) => c.tipo === 'pago');
+  const gasto = pagas.reduce((a, c) => a + c.gasto7, 0);
+  const receita = pagas.reduce((a, c) => a + c.receita7, 0);
+  return { gasto, receita, roas: gasto ? receita / gasto : 0, ativas: state.campaigns.filter((c) => c.status === 'ativa').length, total: state.campaigns.length };
+};
+const failGuard = () => state.campaigns.filter((c) => c.tipo === 'pago' && c.gasto7 > 0 && c.status !== 'pausada' && ((c.alvoRoas && c.roas < c.alvoRoas) || (c.alvoAcos && c.acos > c.alvoAcos)));
+
+/* ---------- router (hash) ---------- */
+let currentRoute = 'visao';
+const TITULOS = { visao: 'Visão geral', produtos: 'Produtos', produto: 'Produto', nichos: 'Nichos e subnichos', campanhas: 'Campanhas', ads: 'Playbook de Ads', plano: 'Plano 3K', agente: 'Agente de vendas', dados: 'Dados e APIs', config: 'Configurações' };
+
+/* favicon por rota: engrenagem na aba de Configurações, onda nas demais */
+const FAVICONS = {
+  wave: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0b0c'/%3E%3Cg fill='none' stroke='%2325f4ee' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M8 13v6M12.5 9v14M17 6v20M21.5 10v12M26 13v6'/%3E%3C/g%3E%3C/svg%3E",
+  gear: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b0b0c'/%3E%3Cpath transform='translate(4 4)' fill='%2325f4ee' d='M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94L14.4 2.81c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/%3E%3C/svg%3E",
+};
+function updateFavicon(route) {
+  const l = $('#favicon');
+  if (!l) return;
+  const want = route === 'config' ? 'gear' : 'wave';
+  if (l.dataset.kind !== want) { l.dataset.kind = want; l.href = FAVICONS[want]; }
+}
+
+/* a rota ativa carrega o único h1 do documento; as outras telas ficam com h2 */
+function fixHeadings(route) {
+  $$('.view').forEach((v) => {
+    const t = v.querySelector('.title-row h1, .title-row h2');
+    if (!t) return;
+    const want = v.id === 'view-' + route ? 'h1' : 'h2';
+    if (t.tagName.toLowerCase() === want) return;
+    const n = document.createElement(want);
+    n.id = t.id;
+    n.style.cssText = t.style.cssText;
+    n.innerHTML = t.innerHTML;
+    t.replaceWith(n);
+  });
+}
+
+function navigate() {
+  const raw = location.hash.replace(/^#\/?/, '') || 'visao';
+  let r = raw.split('/')[0];
+  if (r === 'produto') {
+    const id = parseInt(raw.split('/')[1], 10);
+    if (products.some((p) => p.id === id)) { state.selected = id; }
+    r = 'produto';
+  }
+  if (!TITULOS[r]) r = 'visao';
+  currentRoute = r;
+  $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'view-' + r));
+  fixHeadings(r);
+  $$('[data-route]').forEach((a) => { if (a.dataset.route === r) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  $('#navSheet').classList.remove('open');
+  document.title = TITULOS[r] + ' \u00B7 EchoHub';
+  updateFavicon(r);
+  RENDER[r]();
+}
+function go(r) {
+  const h = '#/' + r;
+  if (location.hash === h) navigate(); else location.hash = h;
+}
+
+const RENDER = {};
+RENDER.visao = function renderVisao() {
+  const a = agg();
+  const ca = campAgg();
+  const fails = failGuard();
+  const hot = products.reduce((m, p) => (p.temp > m.temp ? p : m), products[0]);
+  const fast = SUBNICHOS.reduce((m, s) => (s[1] > m[1] ? s : m), SUBNICHOS[0]);
+
+  $('#findingLine').innerHTML =
+    `Lideran\u00E7a: <strong>${esc(hot.nome)}</strong> a <strong class="m">${hot.temp}\u00B0C</strong> (${fmtSigned(hot.growth7)}% em 7d)` +
+    ` \u00B7 subnicho mais quente: <strong>${esc(fast[0])}</strong> <span class="m">${fmtPct(fast[1], 0)}</span>` +
+    (fails.length ? ` \u00B7 ${fails.length} campanhas abaixo do ROAS-alvo` : '');
+
+  $('#stampVisao').textContent = 'Atualizado ' + state.stamp;
+
+  $('#kpiVisao').innerHTML = [
+    kpiHTML('GMV monitorado', fmtMi(a.gmv), `<span class="up">${fmtSigned(a.growth)}%</span> em 7d \u00B7 10 produtos`, true),
+    kpiHTML('Unidades vendidas', fmtInt(a.unidades), `m\u00E9dia ${fmtInt(a.unidades / 30)} un/dia`),
+    kpiHTML('Comiss\u00E3o m\u00E9dia', fmtBRL2(a.comissaoMedia) + ' <small>por un</small>', `potencial 30d: ${fmtMi(a.comissao)}`),
+    kpiHTML('Verba em ads (7d)', fmtBRL(ca.gasto), `receita rastreada ${fmtBRL(ca.receita)}`),
+    kpiHTML('ROAS m\u00E9dio (7d)', fmtNum1(ca.roas) + '\u00D7', `alvo 2,0\u00D7 \u00B7 ${fails.length ? `<span class="down">${fails.length} abaixo</span>` : '<span class="up">todas no alvo</span>'}`),
+  ].join('');
+
+  const ranked = [...products].sort((x, y) => y.temp - x.temp);
+  $('#topTempList').innerHTML = ranked.map((p, i) =>
+    `<a class="row" href="#/produto/${p.id}">` +
+    `<span class="rank">${String(i + 1).padStart(2, '0')}</span>` +
+    `<span class="grow"><span class="name">${esc(p.nome)}</span><span class="sub2">${esc(p.categoria)} \u00B7 ${esc(p.subnicho)} \u00B7 GMV ${fmtMi(p.gmv)}</span></span>` +
+    tempHTML(p.temp) + '</a>').join('');
+
+  const bands = [0, 0, 0]; /* frio, morno, quente */
+  products.forEach((p) => { if (p.temp >= 85) bands[2]++; else if (p.temp >= 60) bands[1]++; else bands[0]++; });
+  const cores = ['var(--chart-muted)', 'var(--warning)', 'var(--negative)'];
+  $$('#view-visao .heat-scale .seg').forEach((el, i) => { el.style.flex = String(Math.max(bands[i], 0.15)); el.style.background = cores[i]; });
+
+  $('#seasonTitle').textContent = 'Sazonalidade do l\u00EDder \u00B7 ' + hot.nome;
+  if (hot.sazonal) {
+    Charts.line($('#chartSeasonOverview'), { labels: MONTHS, series: [{ name: 'Realizado e proje\u00E7\u00E3o', values: hot.sazonal }], height: 220, today: TODAY, todayLabel: 'hoje', endLabel: true, format: fmtInt });
+  }
+  const dias = Array.from({ length: 14 }, (_, i) => String(13 + i));
+  if (hot.vel) {
+    Charts.bars($('#chartVelocityOverview'), { labels: dias, values: hot.vel, height: 220, highlight: 13, format: fmtInt });
+    $('#velocityMeta').textContent = `${hot.nome.split(' ').slice(0, 3).join(' ')} \u00B7 m\u00E9dia ${fmtInt(hot.vel.reduce((x, y) => x + y, 0) / 14)} un/dia`;
+  }
+
+  const fila = [];
+  for (const c of fails) fila.push({ c, motivo: c.alvoRoas ? `ROAS ${fmtNum1(c.roas)}\u00D7 contra o alvo de ${fmtNum1(c.alvoRoas)}\u00D7` : `ACOS ${fmtPct(c.acos)} contra a meta de ${fmtPct(c.alvoAcos * 100, 0)}` });
+  for (const c of state.campaigns) if (c.tipo === 'pago' && c.status === 'ativa' && c.usoPct >= 90 && !fails.includes(c)) fila.push({ c, motivo: `Or\u00E7amento a ${c.usoPct}% em 7 dias: refor\u00E7ar verba ou pausar` });
+  for (const c of state.campaigns) if (c.status === 'pausada' && !fila.some((f) => f.c === c)) fila.push({ c, motivo: 'Pausada: ' + c.nota });
+  $('#campaignQueue').innerHTML = fila.length
+    ? fila.slice(0, 5).map(({ c, motivo }) =>
+      `<div class="row"><span class="grow"><span class="name">${esc(c.nome)}</span><span class="sub2">${motivo}</span></span>` +
+      `<button class="btn small" type="button" data-diag="${c.id}">Diagnosticar</button></div>`).join('')
+    : '<div class="empty">Nenhuma campanha fora do alvo neste momento.</div>';
+
+  Charts.barList($('#chartSubnichos'), SUBNICHOS.map(([label, v]) => ({ label, value: v })), { format: (v) => fmtPct(v, 0), thin: true });
+};
+
+RENDER.produtos = function renderProdutos() {
+  const cats = [...new Set(products.map((p) => p.categoria))].sort((x, y) => x.localeCompare(y, 'pt-BR'));
+  const fC = $('#fCategoria');
+  const mark = cats.join('|');
+  if (fC.dataset.mark !== mark) {
+    fC.dataset.mark = mark;
+    fC.innerHTML = '<option value="">Todas as categorias</option>' + cats.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  }
+  fC.value = state.categoria;
+  if (fC.value !== state.categoria) { fC.value = ''; state.categoria = ''; }
+
+  const ordens = {
+    gmv: (x, y) => y.gmv - x.gmv,
+    temp: (x, y) => y.temp - x.temp,
+    comissao: (x, y) => y.comissaoUn - x.comissaoUn,
+    growth: (x, y) => (y.growth7 ?? -1e9) - (x.growth7 ?? -1e9),
+  };
+  const list = products.filter((p) => !state.categoria || p.categoria === state.categoria).sort(ordens[state.ordem] || ordens.gmv);
+  $('#tblProdutos tbody').innerHTML = list.map((p, i) =>
+    `<tr data-id="${p.id}">` +
+    `<td class="m">${String(i + 1).padStart(2, '0')}</td>` +
+    `<td class="identity" data-label="Produto"><a class="inklink" href="#/produto/${p.id}">${esc(p.nome)}</a><span class="sub">${esc(p.subnicho)}</span></td>` +
+    `<td data-label="Categoria">${esc(p.categoria)}</td>` +
+    `<td class="n m" data-label="Pre\u00E7o">${fmtBRL2(p.preco)}</td>` +
+    `<td class="n m" data-label="Unidades 30d">${fmtInt(p.unidades30)}</td>` +
+    `<td class="n m" data-label="GMV 30d">${fmtBRL(p.gmv)}</td>` +
+    `<td class="n m" data-label="Comiss\u00E3o">${fmtBRL2(p.comissaoUn)}<span class="sub">${fmtPct(p.comissaoPct, 0)} do pre\u00E7o</span></td>` +
+    `<td data-label="Temperatura">${tempHTML(p.temp)}</td>` +
+    `<td class="n m" data-label="7d">${p.growth7 == null ? '\u2014' : fmtSigned(p.growth7) + '%'}</td>` +
+    `<td><div class="actions"><button class="btn small" type="button" data-open="${p.id}">Ver</button></div></td></tr>`).join('');
+
+  const gmvL = list.reduce((s, p) => s + p.gmv, 0);
+  const unL = list.reduce((s, p) => s + p.unidades30, 0);
+  const comL = list.reduce((s, p) => s + p.comissaoUn * p.unidades30, 0);
+  $('#produtosTotais').textContent = `${list.length} de ${products.length} produtos \u00B7 GMV somado ${fmtBRL(gmvL)} \u00B7 unidades ${fmtInt(unL)} \u00B7 comiss\u00E3o potencial ${fmtBRL(comL)}`;
+};
+
+function setTab(t) {
+  state.tab = t;
+  $$('#view-produto .tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+  ['desempenho', 'qualidade', 'angulos'].forEach((k) => { const el = $('#tab-' + k); if (el) el.hidden = k !== t; });
+  if (t === 'desempenho') tabDesempenho();
+  else if (t === 'qualidade') tabQualidade();
+  else tabAngulos();
+}
+
+RENDER.produto = function renderProduto() {
+  const p = sel();
+  $('#crumbProduto').textContent = p.nome;
+  $('#h-produto').textContent = p.nome;
+  $('#produtoChipLine').innerHTML = `${esc(p.categoria)} \u00B7 ${esc(p.subnicho)} \u00B7 <span class="m">${fmtBRL2(p.preco)}</span> \u00B7 comiss\u00E3o <span class="m">${fmtPct(p.comissaoPct, 0)}</span> \u00B7 ${esc(p.stars)}`;
+  const selEl = $('#selProduto');
+  const mark = products.map((x) => x.id).join('|');
+  if (selEl.dataset.mark !== mark) {
+    selEl.dataset.mark = mark;
+    selEl.innerHTML = products.map((x) => `<option value="${x.id}">${esc(x.nome)}</option>`).join('');
+  }
+  selEl.value = String(p.id);
+  $('#kGmv').textContent = fmtBRL(p.gmv);
+  $('#kUnidades').textContent = fmtInt(p.unidades30);
+  $('#kComissao').textContent = fmtBRL2(p.comissaoUn);
+  $('#kComissaoNota').textContent = `${fmtPct(p.comissaoPct, 0)} do pre\u00E7o \u00B7 fonte ${state.fonte === 'csv' ? 'CSV' : 'simulada EchoTok'}`;
+  setTab(state.tab);
+};
+
+function tabDesempenho() {
+  const p = sel();
+  if (p.semSerie || !p.sazonal) {
+    $('#chartSazonal').innerHTML = '<div class="empty" style="min-height:190px">Este item n\u00E3o tem s\u00E9rie hist\u00F3rica no arquivo importado. A curva de 12 meses vem da Data API ou do feed simulado.</div>';
+    $('#chartVelProduto').innerHTML = '<div class="empty" style="min-height:190px">Sem s\u00E9rie di\u00E1ria no CSV. Conecte a EchoTok Data API para ver a curva de 14 dias.</div>';
+    $('#velNote').textContent = '';
+    return;
+  }
+  Charts.line($('#chartSazonal'), { labels: MONTHS, series: [{ name: '\u00CDndice de vendas', values: p.sazonal }], height: 252, today: TODAY, todayLabel: 'hoje', endLabel: true, format: fmtInt });
+  Charts.bars($('#chartVelProduto'), { labels: Array.from({ length: 14 }, (_, i) => String(13 + i)), values: p.vel, height: 252, highlight: 13, format: fmtInt });
+  $('#velNote').textContent = `M\u00E9dia de ${fmtInt(p.vel.reduce((x, y) => x + y, 0) / 14)} un/dia \u00B7 \u00FAltimas 7 contra primeiras 7: ${fmtSigned(p.growth7)}%`;
+}
+
+function tabQualidade() {
+  const p = sel();
+  if (p.sat == null) { $('#ringSatisfacao').innerHTML = '<div class="empty">Sem satisfa\u00E7\u00E3o registrada.</div>'; }
+  else {
+    Charts.ring($('#ringSatisfacao'), { value: p.sat, label: fmtPct(p.sat * 100, 0), sub: 'de satisfa\u00E7\u00E3o', size: 132 });
+    $('#satNota').textContent = `Avalia\u00E7\u00E3o m\u00E9dia ${esc(p.stars)} \u00B7 base ${state.fonte === 'csv' ? 'do seu CSV' : 'simulada de avalia\u00E7\u00F5es'}`;
+  }
+  if (!p.complaints || !p.complaints.length) {
+    $('#barReclamacoes').innerHTML = '<div class="empty" style="min-height:150px">Sem reclama\u00E7\u00F5es registradas neste arquivo.</div>';
+  } else {
+    Charts.barList($('#barReclamacoes'), p.complaints.map(([label, v]) => ({ label, value: v })), { format: (v) => fmtPct(v, 0), colour: '#e5a93b' });
+  }
+  $('#trustKv').innerHTML =
+    `<span class="k">Envio dentro do prazo</span><span class="v">${esc(p.trust.prazo)}</span>` +
+    `<span class="k">Disputas abertas</span><span class="v">${esc(p.trust.disputas)}</span>` +
+    `<span class="k">Reputa\u00E7\u00E3o</span><span class="v" style="font-family:var(--font)">${esc(p.trust.rep)}</span>`;
+  $('#trustNota').textContent = 'Disputa acima de 1% costuma anteceder reembolsos e queda de temperatura: trate antes de escalar verba.';
+}
+
+function tabAngulos() {
+  const p = sel();
+  if (!p.hooks || !p.hooks.length) {
+    $('#hooksList').innerHTML = '<div class="empty">Sem ganchos no arquivo importado: use o agente para gerar a partir da descri\u00E7\u00E3o.</div>';
+    $('#roteiroList').innerHTML = '<div class="empty">Roteiro gerado pelo agente quando houver descri\u00E7\u00E3o do produto.</div>';
+    return;
+  }
+  const tipos = ['prova direta de resultado', 'teste com a sua m\u00FAsica de fundo', 'compara\u00E7\u00E3o de pre\u00E7o'];
+  $('#hooksList').innerHTML = p.hooks.map((h, i) =>
+    `<div class="row"><span class="rank">${String(i + 1).padStart(2, '0')}</span>` +
+    `<span class="grow"><span class="name" style="font-weight:400">${esc(h)}</span><span class="sub2">Gancho ${i + 1} \u00B7 ${tipos[i] || 'varia\u00E7\u00E3o de abertura'}</span></span>` +
+    `<button class="btn small" type="button" data-use-hook="${i}">Usar</button></div>`).join('');
+  $('#roteiroList').innerHTML = [
+    ['0\u20132s', 'Gancho', p.hooks[0]],
+    ['3\u20137s', 'Problema', `Mostre o inc\u00F4modo que o ${p.subnicho.toLowerCase()} resolve (mostre, n\u00E3o explique)`],
+    ['8\u201312s', 'Prova', 'Teste real na c\u00E2mera, com a sua faixa autoral de fundo'],
+    ['13\u201315s', 'Chamada', 'Uma a\u00E7\u00E3o s\u00F3: \u201Cclica na sacolinha amarela\u201D'],
+  ].map(([t, k, txt]) =>
+    `<div class="row"><span class="chip" style="min-width:54px;justify-content:center;font-family:var(--mono)">${t}</span>` +
+    `<span class="grow"><span class="name">${k}</span><span class="sub2">${esc(txt)}</span></span></div>`).join('');
+}
+
+RENDER.nichos = function renderNichos() {
+  const comSerie = NICHES.filter((n) => n.serie);
+  Charts.line($('#chartNichos'), { labels: MONTHS.slice(0, 12), series: comSerie.map((n) => ({ name: n.nome, values: n.serie })), height: 250, today: 11, todayLabel: 'hoje', legend: '#legendNichos', format: fmtInt });
+  const ordem = [...NICHES].sort((x, y) => y.score - x.score);
+  $('#tblScore tbody').innerHTML = ordem.map((n, i) =>
+    `<tr${i === 0 ? ' aria-selected="true"' : ''}><td class="identity">${esc(n.nome)}</td>` +
+    `<td class="n m">${n.demanda}</td><td class="n m">${n.conc}</td>` +
+    `<td class="n m"${i === 0 ? ' style="color:var(--accent)"' : ''}>${n.score}</td></tr>`).join('');
+  Charts.barList($('#chartSubnichosNichos'), SUBNICHOS.slice(0, 5).map(([label, v]) => ({ label, value: v })), { format: (v) => fmtPct(v, 0) });
+};
+</script>
+
+<script>
+/* ================= LÓGICA (2/2): campanhas/ads/plano/agente/dados + eventos + init ================= */
+
+const STATUS = { ativa: ['pos', 'Ativa'], pausada: [null, 'Pausada'], 'revis\u00E3o': ['warn', 'Em revis\u00E3o'], rascunho: [null, 'Rascunho'] };
+const statusHTML = (s) => { const st = STATUS[s] || [null, s]; return pillHTML(st[0], st[1]); };
+
+RENDER.campanhas = function renderCampanhas() {
+  const ca = campAgg();
+  const fails = failGuard();
+  const pagasComGasto = state.campaigns.filter((c) => c.tipo === 'pago' && c.gasto7 > 0).length;
+  $('#kpiCampanhas').innerHTML = [
+    kpiHTML('Verba investida (7d)', fmtBRL(ca.gasto), `${pagasComGasto} campanhas pagas com gasto`),
+    kpiHTML('Receita atribu\u00EDda (7d)', fmtBRL(ca.receita), 'vendas rastreadas pelas plataformas'),
+    kpiHTML('ROAS m\u00E9dio', fmtNum1(ca.roas) + '\u00D7', `alvo 2,0\u00D7 \u00B7 ${fails.length ? `<span class="down">${fails.length} abaixo</span>` : '<span class="up">todas no alvo</span>'}`),
+    kpiHTML('Campanhas ativas', `${ca.ativas} <small>de ${ca.total}</small>`, 'org\u00E2nicas e pagas'),
+  ].join('');
+
+  $('#guardrailList').innerHTML = fails.length
+    ? fails.map((c) =>
+      `<div class="row"><span class="grow"><span class="name">${esc(c.nome)}</span>` +
+      `<span class="sub2">${c.alvoRoas ? `ROAS ${fmtNum1(c.roas)}\u00D7 contra o alvo de ${fmtNum1(c.alvoRoas)}\u00D7` : `ACOS ${fmtPct(c.acos)} contra a meta de ${fmtPct(c.alvoAcos * 100, 0)}`} \u00B7 ${esc(c.nota)}</span></span>` +
+      `${pillHTML('warn', 'A\u00E7\u00E3o')}<button class="btn small" type="button" data-pause="${c.id}">Pausar</button>` +
+      `<button class="btn small" type="button" data-diag="${c.id}">Diagnosticar</button></div>`).join('')
+    : '<div class="empty">Nenhuma prote\u00E7\u00E3o acionada: todas as campanhas pagas est\u00E3o no alvo.</div>';
+
+  $('#tblCampanhas tbody').innerHTML = state.campaigns.map((c) => {
+    const prod = products.find((p) => p.id === c.produtoId);
+    const resultado = c.tipo === 'organico'
+      ? (c.comissao7 ? fmtBRL(c.comissao7) + '<span class="unit"> em comiss\u00F5es</span>' : '\u2014')
+      : (c.receita7 ? fmtBRL(c.receita7) : '\u2014');
+    const eficiencia = c.roas != null ? fmtNum1(c.roas) + '\u00D7' : c.acos != null ? fmtPct(c.acos) + ' ACOS' : '\u2014';
+    const acoes =
+      (c.status === 'ativa' ? `<button class="btn small" type="button" data-pause="${c.id}">Pausar</button>` : '') +
+      (c.status === 'pausada' || c.status === 'revis\u00E3o' ? `<button class="btn small" type="button" data-resume="${c.id}">Retomar</button>` : '') +
+      `<button class="btn small" type="button" data-diag="${c.id}">Diagn\u00F3stico</button>`;
+    return `<tr data-id="${c.id}">` +
+      `<td class="identity" data-label="Campanha">${esc(c.nome)}<span class="sub">${prod ? esc(prod.nome) : 'produto fora da sess\u00E3o'}</span></td>` +
+      `<td data-label="Plataforma"><span class="chip">${esc(c.plataforma)}</span></td>` +
+      `<td data-label="Status">${statusHTML(c.status)}</td>` +
+      `<td class="n m" data-label="Or\u00E7amento/dia">${c.orcDia ? fmtBRL(c.orcDia) : '\u2014'}</td>` +
+      `<td class="n m" data-label="Uso 7d">${c.usoPct != null ? c.usoPct + '%' : '\u2014'}</td>` +
+      `<td class="n m" data-label="Resultado 7d">${resultado}</td>` +
+      `<td class="n m" data-label="ROAS ou ACOS">${eficiencia}</td>` +
+      `<td><div class="actions">${acoes}</div></td></tr>`;
+  }).join('');
+};
+
+RENDER.ads = function renderAds() {
+  const keys = Object.keys(ADS);
+  const selP = $('#selPlataforma');
+  if (selP.dataset.mark !== keys.join('|')) {
+    selP.dataset.mark = keys.join('|');
+    selP.innerHTML = keys.map((k) => `<option value="${esc(k)}">${esc(k)}</option>`).join('');
+  }
+  selP.value = state.plataforma;
+  if (selP.value !== state.plataforma) { selP.value = keys[0]; state.plataforma = keys[0]; }
+  const ad = ADS[state.plataforma];
+  $('#adsTitulo').textContent = 'Passo a passo \u00B7 ' + state.plataforma;
+  $('#adsMeta').textContent = ad.meta;
+  $('#adsDica').textContent = 'Dica: ' + ad.dica;
+  $('#adsPassos').innerHTML = ad.passos.map((p, i) => `<li style="list-style:decimal outside;padding-left:18px">${esc(p)}</li>`).join('');
+  $('#tblCampos tbody').innerHTML = ad.campos.map(([k, v]) =>
+    `<tr><td class="identity" style="max-width:20ch">${esc(k)}</td><td style="color:var(--muted)">${esc(v)}</td></tr>`).join('');
+  $('#gatilhosList').innerHTML = ad.gatilhos.map(([se, entao]) =>
+    `<div class="row"><span class="grow"><span class="name">${esc(se)}</span><span class="sub2">Ent\u00E3o: ${esc(entao)}</span></span></div>`).join('');
+  $('#complianceList').innerHTML = ad.compliance.map((t) =>
+    `<div class="row"><span class="chip" style="align-self:flex-start">Regra</span><span class="grow" style="color:var(--muted)">${esc(t)}</span></div>`).join('');
+};
+
+RENDER.plano = function renderPlano() {
+  const total = PLANO.checklist.length;
+  const done = state.checklist.filter(Boolean).length;
+  const metade = Math.ceil(total / 2);
+  const item = (t, i) =>
+    `<label class="row" style="cursor:pointer"><input type="checkbox" class="switch" data-check="${i}"${state.checklist[i] ? ' checked' : ''}>` +
+    `<span class="grow"><span class="name"${state.checklist[i] ? ' style="color:var(--muted)"' : ''}>${esc(t)}</span>` +
+    `<span class="sub2">Passo ${i + 1} de ${total}${state.checklist[i] ? ' \u00B7 conclu\u00EDdo' : ''}</span></span></label>`;
+  $('#planoProgresso').innerHTML = `<span class="dot live"></span>${done} de ${total} conclu\u00EDdos`;
+  $('#checklistPlano').innerHTML =
+    `<div class="rows">${PLANO.checklist.slice(0, metade).map(item).join('')}</div>` +
+    `<div class="rows">${PLANO.checklist.slice(metade).map((t, k) => item(t, metade + k)).join('')}</div>`;
+  $('#checklistLabel').textContent = `${done} de ${total} conclu\u00EDdos`;
+  $('#checklistBar').style.width = Math.round(done / total * 100) + '%';
+  $('#paretoList').innerHTML = PLANO.pareto.map(([t, d], i) =>
+    `<div class="row"><span class="rank">${String(i + 1).padStart(2, '0')}</span>` +
+    `<span class="grow"><span class="name">${esc(t)}</span><span class="sub2">${esc(d)}</span></span></div>`).join('');
+  $('#configTiktokList').innerHTML = PLANO.configTiktok.map((t) =>
+    `<div class="row"><span class="chip" style="align-self:flex-start">Config</span><span class="grow" style="color:var(--muted)">${esc(t)}</span></div>`).join('');
+  $('#trilhaList').innerHTML = PLANO.trilha.map(([s, t]) =>
+    `<div class="row"><span class="chip" style="min-width:88px;justify-content:center">${esc(s)}</span><span class="grow" style="color:var(--muted)">${esc(t)}</span></div>`).join('');
+};
+
+/* ---------- agente (respostas por regras sobre os dados da sessão) ---------- */
+const QUICK = [
+  'Monte um roteiro de 15s para o produto selecionado',
+  'Qual a comiss\u00E3o por venda do produto selecionado?',
+  'Diagn\u00F3stico das campanhas abaixo do ROAS',
+  'Vale escalar a verba agora?',
+  'Quais nichos s\u00E3o oceano azul neste m\u00EAs?',
+  'Quando \u00E9 o pico de vendas do meu produto?',
+];
+const FONTE_LABEL = { simulado: 'feed simulado', api: 'EchoTok Data API', csv: 'CSV importado' };
+
+RENDER.agente = function renderAgente() {
+  const p = sel();
+  const modo = sidecarReady() ? 'sidecar ligado' : 'regras locais';
+  $('#agentContexto').innerHTML = `Produto: <strong>${esc(p.nome)}</strong> \u00B7 fonte: ${FONTE_LABEL[state.fonte] || state.fonte} \u00B7 ${esc(modo)}`;
+  $('#quickPrompts').innerHTML = QUICK.map((q) => `<button type="button" data-quick="${esc(q)}">${esc(q)}</button>`).join('');
+};
+
+function addMsg(kind, html) {
+  const log = $('#chatLog');
+  const div = document.createElement('div');
+  div.className = 'msg ' + kind;
+  div.innerHTML = html;
+  log.append(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+const aiSay = (html) => addMsg('ai', html);
+
+function agentAnswer(q) {
+  const t = q.toLowerCase();
+  const p = sel();
+  const a = agg();
+  const ca = campAgg();
+  const fails = failGuard();
+  const A = (s) => `<strong>${esc(s)}</strong>`;
+
+  if (/(roteir|gancho|hook|v[íi]deo)/.test(t)) {
+    if (!p.hooks || !p.hooks.length) return 'O produto selecionado veio do CSV sem ganchos. Me d\u00EA uma frase descrevendo o produto que eu monto o roteiro a partir dela.';
+    return `Roteiro de 15s para ${A(p.nome)} (metade do esfor\u00E7o vai na abertura):` +
+      `<ol><li><strong>0\u20132s \u2014 gancho:</strong> \u201C${esc(p.hooks[0])}\u201D</li>` +
+      `<li><strong>3\u20137s \u00B7 problema:</strong> mostre o inc\u00F4modo sem explicar ainda</li>` +
+      `<li><strong>8\u201312s \u00B7 prova:</strong> teste real na c\u00E2mera, com a sua faixa autoral de fundo</li>` +
+      `<li><strong>13\u201315s \u00B7 CTA:</strong> uma a\u00E7\u00E3o s\u00F3: \u201Cclica na sacolinha amarela\u201D</li></ol>` +
+      `Grave 3 varia\u00E7\u00F5es s\u00F3 do gancho com este mesmo corpo e compare a reten\u00E7\u00E3o de 3s. Velocidade atual do produto: ${fmtInt(p.vel ? p.vel[13] : 0)} un/dia.`;
+  }
+  if (/(margem|comiss|lucro|rentab|vale a pena|vale a pena)/.test(t)) {
+    const potencial = p.comissaoUn * p.unidades30;
+    const breakeven = 60 / Math.max(0.01, p.comissaoUn);
+    return `Comiss\u00E3o de ${A(p.nome)}: ${fmtPct(p.comissaoPct, 0)} sobre ${fmtBRL2(p.preco)} = ${A(fmtBRL2(p.comissaoUn))} por venda.` +
+      ` No ritmo atual (${fmtInt(p.unidades30)} un/30d), isso \u00E9 ${fmtBRL(potencial)} de comiss\u00E3o potencial no m\u00EAs.` +
+      ` Como afiliado voc\u00EA n\u00E3o paga o produto; o custo real \u00E9 tempo e verba. Com R$ 60/dia de an\u00FAncio, o ponto de equil\u00EDbrio \u00E9 ${fmtNum1(breakeven)} vendas por dia.` +
+      ` Regra: s\u00F3 coloque verba se a comiss\u00E3o m\u00E9dia por venda passar de 3\u00D7 o CPA medido nos primeiros 3 dias.`;
+  }
+  if (/(aprova|sacolinha|afiliad|cadastro|seller|3k|3\.?000)/.test(t)) {
+    const next = PLANO.checklist.findIndex((x, i) => !state.checklist[i]);
+    return `Pr\u00F3ximo passo do Plano 3K: ${A(next >= 0 ? PLANO.checklist[next] : 'tudo conclu\u00EDdo: comece a trilha de 30 dias')}.` +
+      (next >= 0 ? ` Faltam ${state.checklist.filter((x) => !x).length} de ${PLANO.checklist.length} itens. <a class="inklink" href="#/plano">Abrir checklist</a>.` : '') +
+      ` Lembre: antes de pedir aprova\u00E7\u00E3o no programa de afiliados, publique 5 v\u00EDdeos com a nova bio, porque conta nova sem conte\u00FAdo costuma ser rejeitada.`;
+  }
+  if (/(sazonal|black friday|natal|dezembro|novembro|pico|esta\u00E7\u00E3o)/.test(t)) {
+    if (!p.sazonal) return `Sem s\u00E9rie sazonal para este item no CSV. Na EchoTok, a aba de hist\u00F3rico do produto traz os \u00EDndices mensais.`;
+    const nov = p.sazonal[12], dez = p.sazonal[13];
+    return `Sazonalidade de ${A(p.nome)}: nov/26 projetado em \u00EDndice ${fmtInt(nov)} e dez/26 em ${fmtInt(dez)} (m\u00E9dia do ano = 100).` +
+      ` Ou seja, ${fmtSigned(nov - 100)}% contra a m\u00E9dia em novembro e ${fmtSigned(dez - 100)}% em dezembro.` +
+      ` A\u00E7\u00E3o: trave criativos e estoque/links at\u00E9 a 1\u00AA semana de novembro, porque quem entra tarde paga CPM mais caro.`;
+  }
+  if (/(roas|campanha|an[uú]ncio|diagn[oó]stic|verba|escalar|pausar|acos|ads)/.test(t)) {
+    if (fails.length) {
+      return `${fails.length} campanha(s) acionaram a prote\u00E7\u00E3o (ROAS abaixo do alvo por 3 dias):` +
+        `<ul>${fails.map((c) => `<li>${A(c.nome)}: ROAS ${fmtNum1(c.roas)}\u00D7 contra alvo ${fmtNum1(c.alvoRoas)}\u00D7</li>`).join('')}</ul>` +
+        `Sequ\u00EAncia recomendada: 1) pausar o pior an\u00FAncio do grupo (n\u00E3o o grupo inteiro); 2) trocar o gancho dos 2 primeiros segundos; 3) se em 3 dias n\u00E3o voltar, reduzir lance em 20%. ROAS m\u00E9dio da conta: ${fmtNum1(ca.roas)}\u00D7.`;
+    }
+    return `Nenhuma campanha fora do alvo agora. ROAS m\u00E9dio ${fmtNum1(ca.roas)}\u00D7 contra alvo 2,0\u00D7.` +
+      ` Para escalar: s\u00F3 aumente 20% por vez, depois de 3 dias seguidos no alvo, e confira o uso de orçamento antes (campanhas a mais de 90% precisam de verba nova, n\u00E3o de lance maior).`;
+  }
+  if (/(nicho|subnicho|oceano|oportunidade|categoria|mercado)/.test(t)) {
+    const top = [...NICHES].sort((x, y) => y.score - x.score)[0];
+    const quentes = SUBNICHOS.filter((s) => s[1] >= 40).map((s) => `${s[0]} (${fmtPct(s[1], 0)})`).join(', ');
+    return `Melhor score de oportunidade: ${A(top.nome)} (demanda ${top.demanda} \u2212 concorr\u00EAncia ${top.conc} = ${top.score}).` +
+      ` Subnichos em aquecimento (crescimento 30d acima de 40%): ${quentes}.` +
+      ` Regra de entrada: escolha um subnicho com crescimento acima de 40% e ao menos dois produtos acima de 80\u00B0C para pegar carona na demanda.`;
+  }
+  if (/(produto|temperatura|l[íi]der|melhor|top|quente)/.test(t)) {
+    const top3 = [...products].sort((x, y) => y.temp - x.temp).slice(0, 3);
+    return `Top 3 por temperatura de vendas agora:` +
+      `<ol>${top3.map((x, i) => `<li>${A(x.nome)}: ${x.temp}\u00B0C, ${fmtSigned(x.growth7)}% em 7d, comiss\u00E3o ${fmtBRL2(x.comissaoUn)}/un</li>`).join('')}</ol>` +
+      `O GMV monitorado da sess\u00E3o soma ${fmtMi(a.gmv)} (+${fmtPct(a.growth)}% de velocidade em 7d).`;
+  }
+  return 'Posso trabalhar com os n\u00FAmeros desta sess\u00E3o. Pergunte por: <strong>roteiro</strong> de 15s, <strong>comiss\u00E3o e ponto de equil\u00EDbrio</strong> de um produto, <strong>diagn\u00F3stico de campanha</strong> e regra de escala, <strong>sazonalidade</strong> (Black Friday/Natal), <strong>nichos</strong> com oceano azul ou o pr\u00F3ximo passo do <strong>Plano 3K</strong>.';
+}
+
+/* ---------- sidecar Python (/chat) ---------- */
+function sidecarCfg() { return state.config.sidecar || {}; }
+function sidecarReady() {
+  const s = sidecarCfg();
+  return !!(s.on && s.url && s.token);
+}
+function fillSidecarForm() {
+  const s = sidecarCfg();
+  const url = $('#cfgSidecarUrl');
+  const token = $('#cfgSidecarToken');
+  const on = $('#cfgSidecarOn');
+  if (url && document.activeElement !== url) url.value = s.url || '';
+  if (token && document.activeElement !== token) token.value = s.token || '';
+  if (on) on.checked = !!s.on;
+  const st = $('#sidecarStatus');
+  if (st && !st.innerHTML) setSidecarStatus(sidecarReady() ? 'pos' : '', sidecarReady() ? 'configurado' : 'regras locais');
+}
+function saveSidecarForm() {
+  const url = ($('#cfgSidecarUrl').value || '').trim().replace(/\/+$/, '');
+  const token = ($('#cfgSidecarToken').value || '').trim();
+  const on = !!$('#cfgSidecarOn').checked;
+  state.config.sidecar = { url, token, on };
+  persist();
+  return state.config.sidecar;
+}
+function setSidecarStatus(kind, text) {
+  const el = $('#sidecarStatus');
+  if (el) el.innerHTML = pillHTML(kind, esc(text));
+}
+async function sidecarFetch(path, opts = {}, timeout = 45000) {
+  const s = sidecarCfg();
+  const base = String(s.url || '').replace(/\/+$/, '');
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeout);
+  try {
+    return await fetch(base + path, {
+      ...opts,
+      signal: ac.signal,
+      headers: { 'Authorization': 'Bearer ' + (s.token || ''), 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+async function testSidecar() {
+  saveSidecarForm();
+  const s = sidecarCfg();
+  if (!s.url) { setSidecarStatus('warn', 'informe a URL'); return; }
+  setSidecarStatus('', 'testando\u2026');
+  try {
+    const r = await sidecarFetch('/health', { method: 'GET' }, 8000);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    setSidecarStatus('pos', `online \u00B7 LLM ${j.llm ? 'on' : 'off'} \u00B7 ${j.skills || 0} skills`);
+  } catch (e) {
+    const why = e.name === 'AbortError' ? 'tempo esgotado' : /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
+    setSidecarStatus('warn', 'falhou: ' + why);
+  }
+}
+function productContext(p) {
+  return {
+    id: String(p.id),
+    nome: String(p.nome || ''),
+    preco: +p.preco || 0,
+    comissaoPct: +p.comissaoPct || 0,
+    comissaoUn: +p.comissaoUn || 0,
+    unidades30: +p.unidades30 || 0,
+    temp: +p.temp || 0,
+    growth7: +p.growth7 || 0,
+    hooks: Array.isArray(p.hooks) ? p.hooks.map(String) : [],
+    sazonal: Array.isArray(p.sazonal) ? p.sazonal.map(Number) : null,
+    vel: Array.isArray(p.vel) ? p.vel.map(Number) : null,
+  };
+}
+function sidecarSession() {
+  const p = sel();
+  return {
+    campaigns: state.campaigns.map((c) => ({
+      id: String(c.id),
+      nome: String(c.nome || 'campanha'),
+      produtoId: c.produtoId != null ? String(c.produtoId) : null,
+      tipo: c.tipo === 'organico' ? 'organico' : 'pago',
+      status: c.status === 'pausada' ? 'pausada' : c.status === 'rascunho' ? 'rascunho' : 'ativa',
+      gasto7: +c.gasto7 || 0,
+      receita7: +c.receita7 || 0,
+      alvoRoas: c.alvoRoas != null ? +c.alvoRoas : null,
+      alvoAcos: c.alvoAcos != null ? +c.alvoAcos : null,
+      nota: String(c.nota || ''),
+      plataforma: String(c.plataforma || ''),
+    })),
+    selected: p ? productContext(p) : null,
+    products: products.slice(0, 12).map(productContext),
+    niches: NICHES.map((n) => ({ nome: n.nome, demanda: n.demanda, conc: n.conc, score: n.score })),
+    subnichos: SUBNICHOS.map(([nome, growth30]) => ({ nome, growth30 })),
+    checklist: state.checklist.map(Boolean),
+    fonte: state.fonte,
+  };
+}
+function agentMeta(r) {
+  const bits = [];
+  bits.push(r.mode === 'llm'
+    ? pillHTML('pos', 'LLM ' + esc(String(r.llmProvider || 'sidecar')))
+    : pillHTML('warn', 'regras locais'));
+  if (r.llmModel) bits.push(pillHTML('', esc(String(r.llmModel))));
+  if (Array.isArray(r.skillsUsed) && r.skillsUsed.length) {
+    bits.push(pillHTML('', 'skills: ' + r.skillsUsed.map((s) => esc(String(s))).join(', ')));
+  }
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${bits.join('')}</div>`;
+}
+
+/* ---------- EchoTok Data API via sidecar ---------- */
+function sidecarErrorDetail(j, status) {
+  let detail = j && (j.detail || j.message || j.error);
+  if (detail && typeof detail !== 'object') return String(detail);
+  if (detail && typeof detail === 'object') return String(detail.message || detail.error || JSON.stringify(detail));
+  return 'HTTP ' + status;
+}
+function apiId(value) {
+  let h = 2166136261;
+  for (const ch of String(value || '')) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0) % 900000 + 100000;
+}
+function apiToProduct(api) {
+  const price = Math.max(0, +api.price || 0);
+  const commissionPct = Math.max(0, Math.min(100, +api.commissionPct || 0));
+  const sales30 = Math.max(0, Math.round(+api.sales30D || +api.sales30d || 0));
+  const sales7 = Math.max(0, Math.round(+api.sales7D || +api.sales7d || 0));
+  const prev7 = Math.max(1, ((sales30 - sales7) / 23) * 7);
+  const growth7 = sales7 > 0 ? Math.round(((sales7 - prev7) / prev7) * 1000) / 10 : null;
+  const rating = Math.max(0, Math.min(5, +api.rating || 0));
+  const trend = +api.trendFlag || 0;
+  const momentum = trend === 1 ? 82 : trend === 2 ? 28 : 55;
+  const quality = rating ? (rating / 5) * 100 : 50;
+  return {
+    id: apiId(api.id),
+    nome: String(api.name || 'Produto EchoTok'),
+    categoria: String(api.category || api.categoryId || 'Sem categoria'),
+    subnicho: String(api.categoryL3Id || api.categoryL2Id || 'Sem subnicho'),
+    preco: price,
+    unidades30: sales30,
+    comissaoPct: commissionPct,
+    temp: Math.max(0, Math.min(100, Math.round(momentum * 0.7 + quality * 0.3))),
+    priorGmv: Math.round((+api.gmv30D || +api.gmv30d || sales30 * price) * 100) / 100,
+    sat: rating ? rating / 5 : 0.5,
+    stars: rating ? rating.toFixed(1).replace('.', ',') + ' de 5' : 'sem avalia\u00E7\u00E3o',
+    trust: {
+      prazo: 'sem dado',
+      disputas: 'sem dado',
+      rep: api.sellerId ? 'loja ' + api.sellerId : 'sem dado',
+    },
+    complaints: [['Sem dados de reclama\u00E7\u00F5es na API', 100]],
+    sazonal: null,
+    vel: null,
+    hooks: [],
+    semSerie: true,
+    cover: api.coverUrl || null,
+    growth7,
+  };
+}
+async function importEchoTok() {
+  if (!sidecarReady()) {
+    $('#testResult').innerHTML = noticeHTML('warn', 'Configure o sidecar em <strong>Configura\u00E7\u00F5es \u2192 Agente sidecar</strong> (URL + token) antes de importar.');
+    return;
+  }
+  $('#testResult').innerHTML = noticeHTML('neutral', 'Importando produtos da EchoTok via sidecar\u2026');
+  try {
+    const r = await sidecarFetch('/echotok/import', {
+      method: 'POST',
+      body: JSON.stringify({ region: 'BR', pageSize: 10, pageNum: 1, includeCategories: true }),
+    }, 30000);
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(sidecarErrorDetail(j, r.status));
+    const list = Array.isArray(j && j.products) ? j.products : [];
+    if (!list.length) {
+      $('#testResult').innerHTML = noticeHTML('warn', 'A EchoTok respondeu sem produtos para os filtros atuais. Nada foi alterado.');
+      return;
+    }
+    const seen = new Set();
+    const mapped = [];
+    list.forEach((api) => {
+      const p = apiToProduct(api);
+      while (seen.has(p.id)) p.id = (p.id + 1) % 1000000 || 1;
+      seen.add(p.id);
+      mapped.push(p);
+    });
+    products.length = 0;
+    products.push(...mapped);
+    recomputarProdutos();
+    state.fonte = 'api';
+    state.selected = products[0].id;
+    state.categoria = '';
+    const q = (j && j.quota) || {};
+    if (q.limit) state.config.real.echotok = { per: 'dia', used: +q.used || 0, limit: +q.limit };
+    persist();
+    $('#testResult').innerHTML = noticeHTML('pos', `${mapped.length} produtos importados da EchoTok. Cota do dia: ${q.used ?? '?'}/${q.limit ?? '?'}. A sess\u00E3o do agente agora usa esta tabela.`);
+    toast('EchoTok API: produtos importados.');
+    RENDER.dados();
+  } catch (e) {
+    const why = e.name === 'AbortError' ? 'tempo esgotado (30s)' : /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
+    $('#testResult').innerHTML = noticeHTML('warn', '<strong>Importa\u00E7\u00E3o falhou:</strong> ' + esc(why) + '.');
+  }
+}
+async function echoTokStatus() {
+  if (!sidecarReady()) {
+    $('#testResult').innerHTML = noticeHTML('warn', 'Configure o sidecar em <strong>Configura\u00E7\u00F5es \u2192 Agente sidecar</strong> (URL + token).');
+    return;
+  }
+  try {
+    const r = await sidecarFetch('/echotok/status', { method: 'GET' }, 10000);
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(sidecarErrorDetail(j, r.status));
+    if (!j || !j.configured) {
+      $('#testResult').innerHTML = noticeHTML('warn', 'Sidecar online, mas a EchoTok n\u00E3o est\u00E1 configurada. Defina <code>ECHOTOK_API_USER</code>/<code>ECHOTOK_API_PASSWORD</code> (ou <code>ECHOTOK_API_KEY</code>) no <code>.env</code> do sidecar.');
+      return;
+    }
+    state.config.real.echotok = { per: 'dia', used: +j.usedToday || 0, limit: +j.dailyLimit || 0 };
+    persist();
+    $('#testResult').innerHTML = noticeHTML('pos', `Sidecar online \u00B7 EchoTok configurada \u00B7 ${j.region || 'BR'} \u00B7 cota ${j.usedToday || 0}/${j.dailyLimit || 0} hoje (restam ${j.remaining ?? '?'}).`);
+  } catch (e) {
+    const why = e.name === 'AbortError' ? 'tempo esgotado (10s)' : /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
+    $('#testResult').innerHTML = noticeHTML('warn', '<strong>Status falhou:</strong> ' + esc(why) + '.');
+  }
+}
+
+let agentBusy = false;
+async function runAgent(q) {
+  if (!q) return;
+  if (!sidecarReady()) { aiSay(agentAnswer(q)); return; }
+  if (agentBusy) { toast('Aguarde a resposta anterior.'); return; }
+  agentBusy = true;
+  const pending = addMsg('ai', '<span class="hint">consultando o sidecar\u2026</span>');
+  try {
+    const r = await sidecarFetch('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message: q, session: sidecarSession(), useRag: true, useLlm: true, limit: 5 }),
+    }, 45000);
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      let detail = j && (j.detail || j.message || j.error);
+      if (detail && typeof detail !== 'string') detail = JSON.stringify(detail);
+      throw new Error(detail || ('HTTP ' + r.status));
+    }
+    if (!j || !j.reply) throw new Error('resposta vazia do sidecar');
+    pending.innerHTML = esc(j.reply).replace(/\n/g, '<br>') + agentMeta(j);
+  } catch (e) {
+    const why = e.name === 'AbortError' ? 'tempo esgotado (45s)' : (e.message || 'falha de rede/CORS');
+    pending.innerHTML = noticeHTML('warn', '<strong>Sidecar indispon\u00EDvel:</strong> ' + esc(why) + '. Respondendo com as regras locais.') + '<div style="margin-top:10px">' + agentAnswer(q) + '</div>';
+  } finally {
+    agentBusy = false;
+    const log = $('#chatLog');
+    if (log) log.scrollTop = log.scrollHeight;
+  }
+}
+
+RENDER.dados = function renderDados() {
+  $$('#segFonte button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fonte === state.fonte)));
+  $('#fonteHint').textContent = {
+    simulado: 'Alimentando com dados simulados locais. Troque para API ou CSV quando quiser n\u00FAmeros reais.',
+    api: 'Modo API: a importa\u00E7\u00E3o usa o sidecar e a chave EchoTok fica no .env do servidor. O navegador nunca recebe essa chave.',
+    csv: 'Alimentando com o CSV importado e salvo neste navegador; use Restaurar para voltar ao feed simulado.',
+  }[state.fonte];
+  $('#tblPlanos tbody').innerHTML = PLANOSECHOTOK.map(([nome, preco, lim]) =>
+    `<tr><td class="identity" style="max-width:14ch">${esc(nome)}${preco === 19.1 ? ' ' + pillHTML('pos', 'recomendado') : ''}</td>` +
+    `<td class="n m">${preco ? 'US$ ' + fmtNum1(preco) : 'US$ 0'}</td><td style="color:var(--muted)">${esc(lim)}</td></tr>`).join('');
+  calcUpdate();
+};
+
+function calcUpdate() {
+  const chamadas = Math.max(0, +$('#calcChamadas').value || 0);
+  const preco = Math.max(0, +$('#calcPreco').value || 0);
+  $('#calcResultado').textContent = fmtBRL2(chamadas * 30 / 1000 * preco);
+}
+
+/* ---------- diálogo de nova campanha ---------- */
+const dlg = $('#dlgCampanha');
+function setTipo(t) {
+  $$('#fcTipo button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tipo === t)));
+  $('#fcBudgetField').hidden = t === 'organico';
+}
+function openDialog() {
+  $('#fcProduto').innerHTML = products.map((p) => `<option value="${p.id}"${p.id === state.selected ? ' selected' : ''}>${esc(p.nome)}</option>`).join('');
+  $('#fcPlataforma').innerHTML = Object.keys(ADS).map((k) => `<option>${esc(k)}</option>`).join('');
+  setTipo('pago');
+  $('#dlgSub').textContent = 'A campanha nasce em rascunho, com resultados zerados; os n\u00FAmeros reais chegam quando a plataforma reportar.';
+  dlg.showModal();
+}
+
+/* ---------- toasts e pré-filha do agente ---------- */
+let toastT;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove('on'), 3400);
+}
+function askAgent(q) {
+  $('#chatInput').value = q || 'Monte um roteiro de 15s para o produto selecionado';
+  go('agente');
+  setTimeout(() => $('#chatInput').focus(), 80);
+}
+const diagQuestion = (c) => {
+  const res = c.roas != null ? `ROAS ${fmtNum1(c.roas)}\u00D7` : c.acos != null ? `ACOS ${fmtPct(c.acos)}` : 'sem resultado ainda';
+  return `Diagn\u00F3stico da campanha "${c.nome}" (${res}). O que eu fa\u00E7o nos pr\u00F3ximos 3 dias?`;
+};
+
+/* ---------- diagnóstico via endpoint /diagnose do sidecar ---------- */
+async function runDiagnose(campaignId) {
+  if (!sidecarReady()) {
+    $('#testResult').innerHTML = noticeHTML('warn', 'Configure o sidecar em <strong>Configura\u00E7\u00F5es \u2192 Agente sidecar</strong> (URL + token).');
+    return;
+  }
+  try {
+    const r = await sidecarFetch('/diagnose', {
+      method: 'POST',
+      body: JSON.stringify({ session: sidecarSession(), campaign_id: campaignId }),
+    }, 30000);
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      let detail = j && (j.detail || j.message || j.error);
+      if (detail && typeof detail !== 'string') detail = JSON.stringify(detail);
+      throw new Error(detail || ('HTTP ' + r.status));
+    }
+    if (!j) throw new Error('resposta vazia do sidecar');
+
+    const fails = j.fails || [];
+    const suggestions = j.suggestions || [];
+    const avg = j.avg_roas != null ? j.avg_roas : 0;
+
+    let html = `<p><strong>ROAS m\u00E9dio da conta:</strong> ${avg.toFixed(2)}\u00D7</p>`;
+    if (fails.length) {
+      html += `<p><strong>${fails.length} campanha(s) abaixo do alvo:</strong></p><ul>`;
+      fails.forEach((f) => {
+        const sug = suggestions.find((s) => s.campaign_id === f.id);
+        html += `<li>${esc(f.nome)} \u2014 ${f.roas != null ? 'ROAS ' + f.roas.toFixed(2) + '\u00D7' : 'ACOS ' + f.acos.toFixed(4)}`;
+        if (sug) {
+          html += ` \u2014 a\u00E7\u00E3o sugerida: ${esc(sug.action)} (conf ${Math.round(sug.confidence * 100)}%)`;
+        }
+        html += `</li>`;
+      });
+      html += `</ul>`;
+    } else {
+      html += `<p class="notice positive">Nenhuma campanha fora do alvo agora.</p>`;
+    }
+
+    const dlg = document.createElement('dialog');
+    dlg.id = 'dlgDiagnose';
+    dlg.innerHTML = `
+      <h3>Diagn\u00F3stico da campanha</h3>
+      ${html}
+      <div class="actions">
+        <button class="btn ghost" type="button" id="btnDiagClose">Fechar</button>
+        <button class="btn primary" type="button" id="btnDiagAgent">Perguntar ao agente</button>
+      </div>
+    `;
+    document.body.appendChild(dlg);
+    dlg.showModal();
+    $('#btnDiagClose').addEventListener('click', () => dlg.close());
+    $('#btnDiagAgent').addEventListener('click', () => {
+      dlg.close();
+      const c = state.campaigns.find((x) => x.id === campaignId);
+      askAgent(c ? diagQuestion(c) : null);
+    });
+    dlg.addEventListener('close', () => dlg.remove());
+  } catch (e) {
+    const why = e.name === 'AbortError' ? 'tempo esgotado (30s)' : /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
+    toast('<strong>Diagn\u00F3stico falhou:</strong> ' + esc(why));
+  }
+}
+
+async function recordDecision(campaignId, action, reason) {
+  if (!sidecarReady()) return; // não bloqueia o fluxo se o sidecar estiver desligado
+  try {
+    await sidecarFetch('/decisions', {
+      method: 'POST',
+      body: JSON.stringify({ campaign_id: campaignId, action, reason, metrics: {}, approved: null }),
+    }, 10000);
+  } catch (e) {
+    // falha silenciosa: a decisão já foi registrada localmente
+  }
+}
+
+/* ---------- CSV ---------- */
+const CSV_HEAD = 'produto,categoria,subnicho,preco,unidades30d,comissao_pct,temperatura,satisfacao';
+const CSV_MODEL = [CSV_HEAD,
+  'Fone TWS gamer Bluetooth 5.3,\u00C1udio & Tech,Fones TWS,69.90,18450,20,98,0.92',
+  'Cal\u00E7a cargo wide leg streetwear,Moda Streetwear,Cal\u00E7as cargo,119.00,6900,16,58,0.86',
+  'S\u00E9rum facial vitamina C 30ml,Beleza & Skincare,S\u00E9rum e rotina,39.90,12800,25,86,0.91'].join('\r\n');
+
+function parseCSV(text) {
+  const linhas = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((l) => l.trim());
+  if (linhas.length < 2) return { erro: 'Arquivo sem linhas de dados: baixe o modelo e siga as 8 colunas na ordem.' };
+  const out = [];
+  let ignoradas = 0;
+  const num = (s, f) => { const v = parseFloat(String(s ?? '').trim().replace(',', '.')); return Number.isFinite(v) ? v : f; };
+  for (let i = 1; i < linhas.length; i++) {
+    const c = linhas[i].split(',');
+    const nome = (c[0] || '').trim();
+    if (!nome) { ignoradas++; continue; }
+    out.push({
+      id: 100 + i, nome,
+      categoria: (c[1] || 'Sem categoria').trim() || 'Sem categoria',
+      subnicho: (c[2] || '\u2014').trim() || '\u2014',
+      preco: num(c[3], 0), unidades30: Math.max(0, Math.round(num(c[4], 0))),
+      comissaoPct: num(c[5], 0), temp: Math.min(100, Math.max(0, Math.round(num(c[6], 0)))),
+      sat: Math.min(1, Math.max(0, num(c[7], 0))),
+      stars: '\u2014', trust: { prazo: '\u2014', disputas: '\u2014', rep: 'Importado via CSV' },
+      complaints: [], sazonal: null, vel: null, semSerie: true,
+    });
+  }
+  if (!out.length) return { erro: 'Nenhuma linha v\u00E1lida encontrada (a coluna produto \u00E9 obrigat\u00F3ria).' };
+  return { out, ignoradas };
+}
+function recomputarProdutos() {
+  for (const p of products) {
+    p.gmv = Math.round(p.preco * p.unidades30 * 100) / 100;
+    p.comissaoUn = Math.round(p.preco * p.comissaoPct / 100 * 100) / 100;
+    if (p.vel) {
+      const f7 = p.vel.slice(0, 7).reduce((a, b) => a + b, 0);
+      const l7 = p.vel.slice(7).reduce((a, b) => a + b, 0);
+      p.growth7 = Math.round((l7 / f7 - 1) * 1000) / 10;
+    } else {
+      p.growth7 = p.growth7 == null ? null : Math.round(p.growth7 * 10) / 10;
+    }
+  }
+}
+function importarCSV(text) {
+  const r = parseCSV(text);
+  if (r.erro) { $('#csvResult').innerHTML = noticeHTML('warn', r.erro); return; }
+  products.length = 0;
+  products.push(...r.out);
+  recomputarProdutos();
+  state.fonte = 'csv';
+  state.selected = products[0].id;
+  state.categoria = '';
+  persist();
+  $('#csvResult').innerHTML = noticeHTML('pos', `${r.out.length} produtos importados${r.ignoradas ? ` \u00B7 ${r.ignoradas} linha(s) ignorada(s)` : ''}. A tabela de produtos agora vem do seu arquivo e fica salva neste navegador.`);
+  toast('CSV importado: veja a tabela em Produtos.');
+  RENDER.dados();
+}
+function restaurarProdutos() {
+  products.length = 0;
+  products.push(...defaults.map((d) => ({ ...d, trust: { ...d.trust } })));
+  state.fonte = 'simulado';
+  state.selected = products[0].id;
+  persist();
+  $('#csvResult').innerHTML = noticeHTML('neutral', 'Produtos restaurados para o feed simulado.');
+  toast('Feed simulado restaurado.');
+  RENDER.dados();
+}
+
+/* ---------- eventos ---------- */
+function bindEvents() {
+  window.addEventListener('hashchange', () => { navigate(); window.scrollTo({ top: 0 }); });
+  let rz;
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => RENDER[currentRoute] && RENDER[currentRoute](), 180); });
+
+  /* navegação do celular */
+  $('#btnMore').addEventListener('click', () => $('#navSheet').classList.add('open'));
+  $('#btnCloseSheet').addEventListener('click', () => $('#navSheet').classList.remove('open'));
+  $('#navSheet').addEventListener('click', (e) => { if (e.target.closest('a')) $('#navSheet').classList.remove('open'); });
+
+  /* cliques delegados globais */
+  document.addEventListener('click', (e) => {
+    const q = e.target.closest('[data-quick]');
+    if (q) { const t = q.dataset.quick; addMsg('user', esc(t)); $('#chatInput').value = ''; setTimeout(() => runAgent(t), 380); return; }
+    const diag = e.target.closest('[data-diag]');
+    if (diag) { const c = state.campaigns.find((x) => x.id === diag.dataset.diag); if (c) runDiagnose(c.id); return; }
+    const pausa = e.target.closest('[data-pause]');
+    if (pausa) { const c = state.campaigns.find((x) => x.id === pausa.dataset.pause); if (c) { c.status = 'pausada'; persist(); RENDER[currentRoute](); recordDecision(c.id, 'pausar', 'Pausado pelo usuário via EchoHub'); toast(`Campanha "${c.nome}" pausada. Reavalie o criativo antes de retomar.`); } return; }
+    const retoma = e.target.closest('[data-resume]');
+    if (retoma) { const c = state.campaigns.find((x) => x.id === retoma.dataset.resume); if (c) { c.status = 'ativa'; persist(); RENDER[currentRoute](); recordDecision(c.id, 'aguardar', 'Retomada pelo usuário via EchoHub'); toast(`Campanha "${c.nome}" retomada: acompanhe o ROAS por 3 dias antes de escalar.`); } return; }
+    const open = e.target.closest('[data-open]');
+    if (open) { location.hash = '#/produto/' + open.dataset.open; return; }
+    const hook = e.target.closest('[data-use-hook]');
+    if (hook) { const p = sel(); askAgent(`Me d\u00EA 3 varia\u00E7\u00F5es deste gancho: "${p.hooks[+hook.dataset.useHook]}"`); return; }
+    if (e.target.closest('[data-new-campaign]')) { openDialog(); return; }
+    if (e.target.closest('[data-refresh]')) {
+      state.stamp = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date());
+      RENDER[currentRoute]();
+      toast('Dados reprocessados (demonstra\u00E7\u00E3o: os n\u00FAmeros s\u00F3 mudam com API ou CSV).');
+      return;
+    }
+    if (e.target.closest('[data-import-csv]')) { go('dados'); setTimeout(() => $('#csvFile').focus(), 120); return; }
+    if (e.target.closest('[data-ask-agent]')) { askAgent(`Monte um roteiro de 15s e dois ganchos para "${sel().nome}"`); return; }
+  });
+
+  /* produtos */
+  $('#tblProdutos tbody').addEventListener('click', (e) => {
+    if (e.target.closest('a,button')) return;
+    const tr = e.target.closest('tr[data-id]');
+    if (tr) location.hash = '#/produto/' + tr.dataset.id;
+  });
+  $('#fCategoria').addEventListener('change', (e) => { state.categoria = e.target.value; RENDER.produtos(); });
+  $('#fOrdem').addEventListener('change', (e) => { state.ordem = e.target.value; RENDER.produtos(); });
+  $('#selProduto').addEventListener('change', (e) => { state.selected = +e.target.value; persist(); go('produto/' + state.selected); });
+
+  /* tabs do produto */
+  $$('#view-produto .tabs button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
+
+  /* campanhas */
+  $('#selPlataforma').addEventListener('change', (e) => { state.plataforma = e.target.value; RENDER.ads(); });
+
+  /* plano 3K */
+  $('#checklistPlano').addEventListener('change', (e) => {
+    const i = +e.target.dataset.check;
+    if (Number.isInteger(i)) {
+      state.checklist[i] = e.target.checked;
+      persist();
+      RENDER.plano();
+      if (state.checklist.every(Boolean)) toast('Checklist completo: comece a trilha de 30 dias.');
+    }
+  });
+
+  /* agente */
+  $('#chatForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = $('#chatInput').value.trim();
+    if (!v) return;
+    addMsg('user', esc(v));
+    $('#chatInput').value = '';
+    setTimeout(() => runAgent(v), 420);
+  });
+
+  /* sidecar do agente */
+  $('#btnSidecarSave').addEventListener('click', () => { saveSidecarForm(); toast('Configura\u00E7\u00E3o do sidecar salva.'); });
+  $('#btnSidecarTest').addEventListener('click', testSidecar);
+  $('#cfgSidecarOn').addEventListener('change', () => { saveSidecarForm(); if (currentRoute === 'agente') RENDER.agente(); });
+  ['cfgSidecarUrl', 'cfgSidecarToken'].forEach((id) => $('#' + id).addEventListener('change', () => saveSidecarForm()));
+
+  /* dados e APIs */
+  $$('#segFonte button').forEach((b) => b.addEventListener('click', () => { state.fonte = b.dataset.fonte; RENDER.dados(); }));
+  $('#btnEchoImport').addEventListener('click', importEchoTok);
+  $('#btnEchoStatus').addEventListener('click', echoTokStatus);
+  $('#calcChamadas').addEventListener('input', calcUpdate);
+  $('#calcPreco').addEventListener('input', calcUpdate);
+  $('#btnModeloCsv').addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + CSV_MODEL], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'modelo-produtos-echohub.csv';
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 800);
+    toast('Modelo baixado: 8 colunas, decimais com ponto ou v\u00EDrgula.');
+  });
+  $('#csvFile').addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => importarCSV(String(fr.result));
+    fr.onerror = () => { $('#csvResult').innerHTML = noticeHTML('warn', 'N\u00E3o consegui ler o arquivo.'); };
+    fr.readAsText(f, 'utf-8');
+    e.target.value = '';
+  });
+  $('#btnResetCsv').addEventListener('click', restaurarProdutos);
+
+  /* configurações */
+  const cfgBox = $('#cfgProviders');
+  cfgBox.addEventListener('click', (e) => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.dataset.cfgToggle) {
+      const i = $('#cfgKey-' + t.dataset.cfgToggle);
+      i.type = i.type === 'password' ? 'text' : 'password';
+      t.textContent = i.type === 'password' ? 'Ver' : 'Ocultar';
+      return;
+    }
+    if (t.dataset.cfgSave) {
+      const pid = t.dataset.cfgSave;
+      const v = $('#cfgKey-' + pid).value.trim();
+      state.config.keys[pid] = v;
+      persist();
+      toast(v ? 'Chave guardada neste navegador.' : 'Campo vazio: nada guardado.');
+      return;
+    }
+    if (t.dataset.cfgTest) { cfgTest(t.dataset.cfgTest); return; }
+    if (t.dataset.cfgModels) { delete state.config.sel[t.dataset.cfgModels]; persist(); RENDER.config(); return; }
+  });
+  cfgBox.addEventListener('change', (e) => {
+    const tipo = e.target.closest('[data-cfg-tipo]');
+    if (tipo) { const f = state.config.filtros[tipo.dataset.cfgTipo] || (state.config.filtros[tipo.dataset.cfgTipo] = {}); f.tipo = tipo.value; RENDER.config(); return; }
+    const custo = e.target.closest('[data-cfg-custo]');
+    if (custo) { const f = state.config.filtros[custo.dataset.cfgCusto] || (state.config.filtros[custo.dataset.cfgCusto] = {}); f.custo = custo.value; RENDER.config(); return; }
+    const mod = e.target.closest('[data-cfg-model]');
+    if (mod) { state.config.sel[mod.dataset.cfgModel] = mod.value; persist(); RENDER.config(); return; }
+    const lim = e.target.closest('[data-cfg-lim]');
+    if (lim) { state.config.limiteCustom[lim.dataset.cfgLim] = Math.max(1, +lim.value || 1); persist(); RENDER.config(); toast('Limite local ajustado.'); return; }
+  });
+  cfgBox.addEventListener('input', (e) => {
+    const c = e.target.closest('[id^="cfgCustom-"]');
+    if (c) { const pid = c.id.slice('cfgCustom-'.length); state.config.sel[pid] = c.value.trim(); state.config.custom[pid] = c.value.trim(); persist(); return; }
+    const b = e.target.closest('[id^="cfgBase-"]');
+    if (b) { state.config.base[b.id.slice('cfgBase-'.length)] = b.value.trim(); persist(); return; }
+  });
+  $('#btnResetUso').addEventListener('click', () => { state.config.uso = {}; state.config.real = {}; persist(); RENDER.config(); toast('Contadores locais zerados.'); });
+  $('#btnLoadSkills').addEventListener('click', async () => {
+    if (!sidecarReady()) {
+      toast('Configure o sidecar em Configurações → Agente sidecar.');
+      return;
+    }
+    try {
+      const r = await sidecarFetch('/skills', { method: 'GET' }, 10000);
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) throw new Error('Falha ao carregar skills');
+      renderSkills(j.skills || []);
+      $('#skillsCount').textContent = `${j.count ?? 0} skills`;
+    } catch (e) {
+      const why = /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
+      toast('Falha ao carregar skills: ' + esc(why));
+    }
+  });
+  $('#cfgCalcP').addEventListener('change', () => {
+    state.config.calc.p = $('#cfgCalcP').value;
+    state.config.calc.m = (cfgModelsFor(state.config.calc.p)[0] || {}).id || '';
+    fillCalcModels(); setCalcModel(); cfgCalcUpdate();
+  });
+  $('#cfgCalcM').addEventListener('change', () => { state.config.calc.m = $('#cfgCalcM').value; setCalcModel(); cfgCalcUpdate(); });
+  ['cfgIn', 'cfgOut', 'cfgPin', 'cfgPout', 'cfgFx'].forEach((id) => $('#' + id).addEventListener('input', cfgCalcUpdate));
+
+  /* zona de risco: dois cliques, com aviso do que será apagado */
+  let arm = null;
+  const btnR = $('#btnLimparTudo');
+  btnR.addEventListener('click', () => {
+    if (!arm) {
+      btnR.textContent = 'Confirmar: apago chave, campanhas e checklist';
+      toast('Clique de novo para confirmar: apaga chave, campanhas criadas, checklist e CSV deste navegador.');
+      arm = setTimeout(() => { arm = null; btnR.textContent = 'Apagar meus dados locais'; }, 5000);
+      return;
+    }
+    clearTimeout(arm); arm = null;
+    try { localStorage.removeItem(LS); } catch (e) { /* segue */ }
+    state.fonte = 'simulado';
+    state.config = cfgDefault();
+    state.checklist = PLANO.checklist.map(() => false);
+    state.campaigns = DEFAULT_CAMPAIGNS.map((c) => ({ ...c }));
+    restaurarProdutos();
+    btnR.textContent = 'Apagar meus dados locais';
+    toast('Dados locais apagados; a sess\u00E3o voltou ao estado de demonstra\u00E7\u00E3o (chaves de API inclu\u00EDdas).');
+  });
+
+  /* diálogo */
+  $$('#fcTipo button').forEach((b) => b.addEventListener('click', () => setTipo(b.dataset.tipo)));
+  $('#btnCancelarCampanha').addEventListener('click', () => dlg.close());
+  $('#formCampanha').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const prod = products.find((p) => p.id === +$('#fcProduto').value) || products[0];
+    const tipo = ($$('#fcTipo button').find((b) => b.getAttribute('aria-pressed') === 'true') || {}).dataset?.tipo || 'pago';
+    const plat = $('#fcPlataforma').value;
+    const orcDia = tipo === 'pago' ? Math.max(10, +$('#fcBudget').value || 60) : 0;
+    state.campaigns.push({
+      id: 'u' + Date.now().toString(36), nome: `${plat} \u00B7 ${prod.nome.slice(0, 30)}`,
+      plataforma: plat, tipo, produtoId: prod.id, status: 'rascunho',
+      orcDia, gasto7: 0, receita7: 0, alvoRoas: tipo === 'pago' ? 2 : undefined,
+      nota: 'Criada no EchoHub em ' + new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date()),
+    });
+    persist();
+    dlg.close();
+    toast('Campanha criada em rascunho: preencha os campos na plataforma antes de ativar.');
+    go('campanhas');
+  });
+}
+
+/* ---------- aba Configurações: render, testes de conexão e calculadora ---------- */
+const CFG_TIPO_LABEL = { chat: 'Chat', codigo: 'C\u00F3digo', imagem: 'Imagem', tts: 'TTS', embedding: 'Embeddings' };
+const CFG_TIPO_ORDEM = ['Gr\u00E1tis', 'Pagos \u00B7 Chat', 'Pagos \u00B7 C\u00F3digo', 'Pagos \u00B7 Imagem', 'Pagos \u00B7 TTS', 'Pagos \u00B7 Embeddings'];
+
+const diaAtual = () => new Date().toISOString().slice(0, 10);
+const mesAtual = () => diaAtual().slice(0, 7);
+function usoDe(pid) {
+  if (!state.config.uso[pid]) state.config.uso[pid] = { d: '', m: '', day: 0, month: 0 };
+  const u = state.config.uso[pid];
+  if (u.d !== diaAtual()) { u.d = diaAtual(); u.day = 0; }
+  if (u.m !== mesAtual()) { u.m = mesAtual(); u.month = 0; }
+  return u;
+}
+function bumpUsage(pid) {
+  const u = usoDe(pid);
+  u.day += 1; u.month += 1;
+  persist();
+}
+function limiteDe(pid, per) {
+  const p = CFG_PROVIDERS.find((x) => x.id === pid) || {};
+  if (per === 'mes') return p.limiteMes || 0;
+  const c = state.config.limiteCustom[pid];
+  return c != null && !Number.isNaN(+c) ? +c : (p.limiteDia || 0);
+}
+function cfgKeyDe(p) { return state.config.keys[p.id] || ''; }
+
+function cfgFetch(url, opts = {}, timeout = 10000) {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeout);
+  return fetch(url, { ...opts, signal: ac.signal })
+    .then(async (r) => {
+      const txt = await r.text();
+      let j = null;
+      try { j = JSON.parse(txt); } catch (e) { /* resposta não-JSON */ }
+      return { ok: r.ok, status: r.status, j, txt: txt.slice(0, 200) };
+    })
+    .finally(() => clearTimeout(t));
+}
+
+async function loadOpenRouterModels() {
+  if (OR_MODELS.length) return;
+  try {
+    const r = await cfgFetch('https://openrouter.ai/api/v1/models', {}, 12000);
+    if (r.ok && r.j && Array.isArray(r.j.data)) {
+      const norm = (v) => (v > 0 && v < 0.01 ? v * 1e6 : v);
+      OR_MODELS = r.j.data.map((m) => {
+        const id = String(m.id || '');
+        const pin = norm(Number(m.pricing && m.pricing.prompt) || 0);
+        const pout = norm(Number(m.pricing && m.pricing.completion) || 0);
+        const outs = (m.architecture && m.architecture.output_modalities) || ['text'];
+        const tipo = outs.includes('image') ? 'imagem' : /cod(er|ex)|code/i.test(id) ? 'codigo' : 'chat';
+        const custo = id.endsWith(':free') || (pin === 0 && pout === 0) ? 'gratis' : 'pago';
+        return { id, nome: m.name || id, tipo, custo, pin, pout, nota: 'pre\u00E7o estimado do cat\u00E1logo OpenRouter' };
+      });
+      if (currentRoute === 'config') RENDER.config();
+    }
+  } catch (e) { /* cat\u00E1logo ao vivo indispon\u00EDvel (offline/CORS): fica o campo de ID manual */ }
+}
+
+function cfgModelsFor(pid) {
+  if (pid === 'openrouter') return OR_MODELS;
+  return LLM_MODELS.filter((m) => m.p === pid);
+}
+
+function cfgUsageHTML(p) {
+  const u = usoDe(p.id);
+  const real = state.config.real[p.id] || {};
+  const partes = [];
+  let maior = 0;
+  const linha = (n, max, realFlag, label) => {
+    const pct = max ? n / max : 0;
+    maior = Math.max(maior, pct);
+    return `<span>${label}: <strong class="m">${fmtInt(n)}</strong>${max ? ' de ' + fmtInt(max) : ''}${realFlag ? ' <span title="contador lido do provedor na \u00FAltima verifica\u00E7\u00E3o">(real)</span>' : ''}</span>` +
+      `<span class="meter" style="flex:1 1 120px;max-width:220px"><i style="width:${Math.min(100, Math.round(pct * 100))}%"></i></span>`;
+  };
+  if (p.limiteDia) partes.push(linha(real.per === 'dia' ? real.used : u.day, limiteDe(p.id, 'dia'), real.per === 'dia', 'Dia'));
+  if (p.limiteMes) partes.push(linha(real.per === 'mes' ? real.used : u.month, p.limiteMes, real.per === 'mes', 'M\u00EAs'));
+  if (!partes.length) return '';
+  return `<div class="cfg-usage${maior >= 1 ? ' full' : ''}">${partes.join('')}</div>`;
+}
+
+function cfgCard(p) {
+  const key = cfgKeyDe(p);
+  const st = state.config.st[p.id];
+  const statusHTML = `<span class="cfg-status" id="cfgStatus-${p.id}">${st ? pillHTML(st.pill, esc(st.txt)) : pillHTML('', 'sem teste')}</span>`;
+  const head = `<div class="cfg-head"><span class="name">${esc(p.nome)}</span>${p.badge ? `<span class="chip">${esc(p.badge)}</span>` : ''}` +
+    `${p.doc ? `<a class="inklink faint" href="${p.doc}" target="_blank" rel="noopener" style="font-size:12px">docs<svg><use href="#i-external"/></svg></a>` : ''}${statusHTML}</div>`;
+  const chaves = p.sidecarOnly
+    ? `<p class="cfg-note" style="margin:8px 0 0">Chave no servidor: <code>.env</code> do sidecar. O navegador não guarda nem envia essa chave.</p>` +
+      `<div class="cfg-row" style="margin-top:8px"><button class="btn small primary" type="button" data-cfg-test="${p.id}">Testar sidecar</button></div>`
+    : `<div class="cfg-row">` +
+      `<input class="input" type="password" id="cfgKey-${p.id}" value="${esc(key)}" placeholder="${esc(p.prefixo ? p.prefixo + '...' : 'chave da conta')}" autocomplete="off" aria-label="Chave de ${esc(p.nome)}">` +
+      `<button class="btn small" type="button" data-cfg-toggle="${p.id}">Ver</button>` +
+      `<button class="btn small" type="button" data-cfg-save="${p.id}">Salvar</button>` +
+      `<button class="btn small primary" type="button" data-cfg-test="${p.id}">Testar</button></div>`;
+
+  if (p.kind === 'dados') {
+    return `<div class="cfg-card" data-p="${p.id}">${head}${chaves}${cfgUsageHTML(p)}<p class="cfg-note">${esc(p.nota)}</p></div>`;
+  }
+
+  const f = state.config.filtros[p.id] || (state.config.filtros[p.id] = { tipo: 'todos', custo: 'todos' });
+  const lista = cfgModelsFor(p.id);
+  const filtrada = lista.filter((m) => (f.tipo === 'todos' || m.tipo === f.tipo) && (f.custo === 'todos' || m.custo === f.custo));
+  const grupos = {};
+  filtrada.forEach((m) => {
+    const g = m.custo === 'gratis' ? 'Gr\u00E1tis' : 'Pagos \u00B7 ' + (CFG_TIPO_LABEL[m.tipo] || m.tipo);
+    (grupos[g] = grupos[g] || []).push(m);
+  });
+  let opts = '<option value="">(nenhum escolhido)</option>';
+  CFG_TIPO_ORDEM.forEach((g) => {
+    if (!grupos[g]) return;
+    opts += `<optgroup label="${g}">` + grupos[g].map((m) =>
+      `<option value="${esc(m.id)}"${state.config.sel[p.id] === m.id ? ' selected' : ''}>${esc(m.nome)}</option>`).join('') + '</optgroup>';
+  });
+  if (lista.some((m) => m.id === state.config.sel[p.id]) && !filtrada.some((m) => m.id === state.config.sel[p.id])) {
+    const m = lista.find((x) => x.id === state.config.sel[p.id]);
+    opts += `<option value="${esc(m.id)}" selected>${esc(m.nome)} (fora do filtro)</option>`;
+  }
+  opts += `<option value="__custom"${state.config.sel[p.id] === '__custom' ? ' selected' : ''}>Digitar outro ID</option>`;
+  const selV = state.config.sel[p.id] || '';
+  const manual = p.id === 'omnirouter' || (selV && selV !== '__custom' && !lista.some((m) => m.id === selV)) || selV === '__custom';
+  const modelCtl = manual
+    ? `<input class="input" id="cfgCustom-${p.id}" list="cfgCombos-${p.id}" value="${esc(selV === '__custom' ? state.config.custom[p.id] || '' : selV)}" placeholder="id do modelo/combo no provedor" autocomplete="off" aria-label="ID do modelo de ${esc(p.nome)}">` +
+      (p.id === 'omnirouter' ? `<datalist id="cfgCombos-${p.id}"><option value="auto/best-free"><option value="auto/best-coding"><option value="auto/best-fast"><option value="auto/best-reasoning"><option value="auto/best-vision"><option value="auto/chat"><option value="auto/cheap"></datalist>` : '') +
+      (p.id === 'omnirouter' ? '' : `<button class="btn small" type="button" data-cfg-models="${p.id}">Voltar \u00E0 lista</button>`)
+    : `<select class="input" data-cfg-model="${p.id}" aria-label="Modelo de ${esc(p.nome)}">${opts}</select>`;
+  const baseCtl = p.basePadrao
+    ? `<div class="cfg-row"><span class="cfg-lbl" style="flex:1 1 280px"><span>Endpoint base (compat\u00EDvel com OpenAI)</span><input class="input" id="cfgBase-${p.id}" value="${esc(state.config.base[p.id] || p.basePadrao)}" autocomplete="off"></span></div>`
+    : '';
+  const semLista = p.id !== 'omnirouter' && !lista.length;
+  return `<div class="cfg-card" data-p="${p.id}">${head}${chaves}${baseCtl}` +
+    `<div class="cfg-row">` +
+    `<select class="input" data-cfg-tipo="${p.id}" aria-label="Tipo de modelo de ${esc(p.nome)}">` +
+    `${['todos', 'chat', 'codigo', 'imagem', 'tts', 'embedding'].map((t) => `<option value="${t}"${f.tipo === t ? ' selected' : ''}>${t === 'todos' ? 'Todos os tipos' : CFG_TIPO_LABEL[t]}</option>`).join('')}</select>` +
+    `<select class="input" data-cfg-custo="${p.id}" aria-label="Custo do modelo de ${esc(p.nome)}">` +
+    `${[['todos', 'Gr\u00E1tis e pagos'], ['gratis', 'S\u00F3 gr\u00E1tis'], ['pago', 'S\u00F3 pagos']].map(([v, l]) => `<option value="${v}"${f.custo === v ? ' selected' : ''}>${l}</option>`).join('')}</select>` +
+    `${modelCtl}</div>` +
+    `${semLista ? '<p class="cfg-note">Cat\u00E1logo ao vivo n\u00E3o carregou (offline ou CORS): use \u201CDigitar outro ID\u201D ou recarregue a p\u00E1gina.</p>' : ''}` +
+    `${cfgUsageHTML(p)}<p class="cfg-note">${esc(p.nota)}</p></div>`;
+}
+
+function cfgLimRow(p) {
+  const u = usoDe(p.id);
+  const real = state.config.real[p.id] || {};
+  if (!p.limiteDia && !p.limiteMes) {
+    return `<tr><td class="identity">${esc(p.nome)}</td><td style="color:var(--muted)">${esc(p.notaLimite)}</td>` +
+      `<td class="n">${'\u2014'}</td><td class="n">${'\u2014'}</td><td></td><td>${pillHTML('', 'monitora gasto')}</td></tr>`;
+  }
+  const maxDia = limiteDe(p.id, 'dia');
+  const maxMes = p.limiteMes || 0;
+  const nDia = real.per === 'dia' ? real.used : u.day;
+  const nMes = real.per === 'mes' ? real.used : u.month;
+  const pct = Math.max(maxDia ? nDia / maxDia : 0, maxMes ? nMes / maxMes : 0);
+  const estado = pct >= 1 ? pillHTML('neg', 'trava local') : pct >= 0.8 ? pillHTML('warn', '80% atingido') : pillHTML('pos', 'folga');
+  const ajuste = p.limiteDia && (p.id === 'gemini' || p.id === 'echotok')
+    ? `<input class="input" type="number" min="1" step="1" value="${maxDia}" data-cfg-lim="${p.id}" aria-label="Limite di\u00E1rio local de ${esc(p.nome)}">`
+    : `<span class="hint">${p.id === 'openrouter' ? 'segue o cr\u00E9dito comprado' : 'fixo nos docs'}</span>`;
+  return `<tr><td class="identity">${esc(p.nome)}</td><td style="color:var(--muted)">${esc(p.notaLimite)}</td>` +
+    `<td class="n m">${fmtInt(nDia)}${maxDia ? '/' + fmtInt(maxDia) : ''}${real.per === 'dia' ? '*' : ''}</td>` +
+    `<td class="n m">${fmtInt(nMes)}${maxMes ? '/' + fmtInt(maxMes) : ''}${real.per === 'mes' ? '*' : ''}</td>` +
+    `<td>${ajuste}</td><td>${estado}</td></tr>`;
+}
+
+function fillCalcModels() {
+  const c = state.config.calc;
+  const lista = cfgModelsFor(c.p);
+  $('#cfgCalcM').innerHTML = lista.map((m) =>
+    `<option value="${esc(m.id)}"${c.m === m.id ? ' selected' : ''}>${esc(m.nome)}${m.custo === 'gratis' ? ' (gr\u00E1tis)' : ''}</option>`).join('');
+}
+function setCalcModel() {
+  const c = state.config.calc;
+  const lista = cfgModelsFor(c.p);
+  const m = lista.find((x) => x.id === c.m) || lista[0];
+  if (!m) { $('#cfgCalcNota').textContent = 'Sem modelos listados para este provedor: digite os pre\u00E7os por 1M manualmente.'; return; }
+  c.m = m.id;
+  $('#cfgPin').value = m.pin;
+  $('#cfgPout').value = m.pout;
+  $('#cfgCalcNota').textContent = m.custo === 'gratis'
+    ? 'Modelo com camada gr\u00E1tis: gasto zero dentro do limite di\u00E1rio; os pre\u00E7os ao lado valem para a variante paga.'
+    : (m.nota || '');
+}
+function cfgCalcUpdate() {
+  const c = state.config.calc;
+  c.in = Math.max(0, +$('#cfgIn').value || 0);
+  c.out = Math.max(0, +$('#cfgOut').value || 0);
+  c.pin = Math.max(0, +$('#cfgPin').value || 0);
+  c.pout = Math.max(0, +$('#cfgPout').value || 0);
+  c.fx = Math.max(0, +$('#cfgFx').value || 0);
+  const dia = (c.in * c.pin + c.out * c.pout) / 1e6;
+  $('#cfgCalcDia').textContent = 'US$ ' + nfX.format(dia) + ' \u00B7 R$ ' + nfX.format(dia * c.fx);
+  $('#cfgCalcMes').textContent = 'US$ ' + nfX.format(dia * 30) + ' \u00B7 R$ ' + nfX.format(dia * 30 * c.fx);
+  persist();
+}
+
+function renderSkills(skills) {
+  const el = $('#skillsList');
+  if (!skills || !skills.length) {
+    el.innerHTML = '<div class="empty">Nenhuma skill encontrada.</div>';
+    return;
+  }
+  el.innerHTML = skills.map((s) =>
+    `<div class="rows"><div class="row"><span class="grow"><span class="name">${esc(s.name || s.id)}</span><span class="sub2">${esc(s.whenToUse || '')} \u00B7 intents: ${(s.intents || []).join(', ')}</span></span>` +
+    `<span class="chip">${esc(s.agent || '—')}</span></div></div>`).join('');
+}
+
+async function cfgTestEchoTok(pid, stSet) {
+  if (!sidecarReady()) {
+    stSet('warn', 'Configure o sidecar em Agente (URL + token) antes de testar.');
+    return;
+  }
+  stSet('', 'Consultando o sidecar\u2026');
+  try {
+    const r = await sidecarFetch('/echotok/status', { method: 'GET' }, 10000);
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      let detail = j && (j.detail || j.message || j.error);
+      if (detail && typeof detail !== 'string') detail = detail.message || JSON.stringify(detail);
+      throw new Error(detail || ('HTTP ' + r.status));
+    }
+    if (!j || !j.configured) {
+      stSet('warn', 'Sidecar online, mas EchoTok n\u00E3o configurada. Defina ECHOTOK_API_USER/ECHOTOK_API_PASSWORD no .env.');
+    } else {
+      state.config.real[pid] = { per: 'dia', used: +j.usedToday || 0, limit: +j.dailyLimit || 0 };
+      persist();
+      stSet('pos', `Sidecar online \u00B7 EchoTok configurada \u00B7 cota ${j.usedToday || 0}/${j.dailyLimit || 0} hoje`);
+    }
+  } catch (e) {
+    const why = e.name === 'AbortError' ? 'tempo esgotado (10s)' : /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
+    stSet('warn', 'Falhou: ' + why + '.');
+  }
+  if (currentRoute === 'config') RENDER.config();
+}
+
+async function cfgTest(pid) {
+  const p = CFG_PROVIDERS.find((x) => x.id === pid);
+  const stSet = (pill, txt) => {
+    state.config.st[pid] = { pill, txt };
+    persist();
+    const el = $('#cfgStatus-' + pid);
+    if (el) el.innerHTML = pillHTML(pill, esc(txt));
+  };
+  if (p.sidecarOnly) { await cfgTestEchoTok(pid, stSet); return; }
+  const key = cfgKeyDe(p).trim();
+  if (!key) { stSet('warn', 'Salve a chave antes de testar.'); return; }
+  if (p.prefixo && !key.startsWith(p.prefixo)) { stSet('warn', 'Formato inesperado: chaves de ' + p.nome + ' come\u00E7am com ' + p.prefixo + '. Nada foi enviado.'); return; }
+  const u = usoDe(pid);
+  const maxDia = limiteDe(pid, 'dia');
+  const maxMes = p.limiteMes || 0;
+  if ((maxDia && u.day >= maxDia) || (maxMes && u.month >= maxMes)) {
+    stSet('warn', 'Contador local no limite (' + (maxDia ? u.day + '/' + maxDia + ' hoje' : u.month + '/' + maxMes + ' no m\u00EAs') + '). Teste bloqueado para proteger a cota: use Zerar contadores s\u00F3 se o provedor j\u00E1 renovou.');
+    return;
+  }
+  stSet('', 'Testando...');
+  try {
+    if (p.test === 'openrouter') {
+      const r = await cfgFetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: 'Bearer ' + key } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const fr = r.j && r.j.data && r.j.data.free_model_daily_requests;
+      if (fr) {
+        state.config.real[pid] = { per: 'dia', used: fr.used, limit: fr.limit };
+        stSet('pos', 'OK: chave v\u00E1lida \u00B7 :free hoje ' + fr.used + '/' + fr.limit + ' (restam ' + fr.remaining + ')');
+      } else stSet('pos', 'OK: chave v\u00E1lida (sem contador :free nesta conta).');
+    } else if (p.test === 'gemini') {
+      const r = await cfgFetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + encodeURIComponent(key) + '&pageSize=200');
+      if (!r.ok) throw new Error('HTTP ' + r.status + (r.j && r.j.error && r.j.error.message ? ' \u00B7 ' + r.j.error.message : ''));
+      stSet('pos', 'OK: ' + ((r.j.models || []).length) + ' modelos vis\u00EDveis nesta chave (listagem n\u00E3o gera texto).');
+    } else if (p.test === 'openai') {
+      const r = await cfgFetch('https://api.openai.com/v1/models', { headers: { Authorization: 'Bearer ' + key } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      stSet('pos', 'OK: ' + ((r.j.data || []).length) + ' modelos na conta.');
+    } else if (p.test === 'anthropic') {
+      const r = await cfgFetch('https://api.anthropic.com/v1/models?limit=20', { headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      stSet('pos', 'OK: ' + ((r.j.data || []).length) + ' modelos listados (Haiku, Sonnet, Opus...).');
+    } else if (p.test === 'compat') {
+      const base = (state.config.base[pid] || p.basePadrao || '').replace(/\/+$/, '');
+      const r = await cfgFetch(base + '/models', { headers: { Authorization: 'Bearer ' + key } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      stSet('pos', 'OK: ' + base + '/models respondeu com ' + ((r.j.data || []).length) + ' modelos.');
+    } else if (p.test === 'serp') {
+      const r = await cfgFetch('https://serpapi.com/account.json?api_key=' + encodeURIComponent(key));
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = r.j || {};
+      state.config.real[pid] = { per: 'mes', used: j.this_month_usage || 0, limit: j.total_searches_available || (p.limiteMes || 0) };
+      stSet('pos', 'OK: plano ' + (j.plan_name || '?') + ' \u00B7 ' + (j.total_searches_left != null ? fmtInt(j.total_searches_left) + ' buscas restantes no m\u00EAs' : 'saldo lido'));
+    } else {
+      stSet('pos', 'Chave guardada: formato aceito. A 1\u00AA chamada real de dados gasta 1 das ' + (maxDia || 50) + ' do dia (contador local abaixo).');
+    }
+    if (p.test !== 'none') bumpUsage(pid);
+  } catch (e) {
+    const motivo = e.name === 'AbortError' ? 'tempo esgotado (10s)' : /fetch|network|load/i.test(e.message || '') ? 'rede ou CORS do navegador' : (e.message || 'erro');
+    const hint = CURL_HINT[pid] ? ' Teste no terminal: <code>' + esc(String(CURL_HINT[pid]).replace('YOUR_API_KEY', key.slice(0, 6) + '...')) + '</code>' : '';
+    stSet('warn', 'Falhou: ' + motivo + '.' + hint);
+  }
+  if (currentRoute === 'config') RENDER.config();
+}
+
+RENDER.config = function renderConfig() {
+  fillSidecarForm();
+  $('#cfgProviders').innerHTML = CFG_PROVIDERS.map(cfgCard).join('');
+  $('#tblLimites tbody').innerHTML = CFG_PROVIDERS.map(cfgLimRow).join('');
+  $('#cfgCalcP').innerHTML = CFG_PROVIDERS.filter((p) => p.kind === 'llm').map((p) =>
+    `<option value="${p.id}"${state.config.calc.p === p.id ? ' selected' : ''}>${esc(p.nome)}</option>`).join('');
+  fillCalcModels();
+  setCalcModel();
+  cfgCalcUpdate();
+  loadOpenRouterModels();
+};
+
+/* ---------- init ---------- */
+restore();
+bindEvents();
+addMsg('ai', 'Sou o agente desta sess\u00E3o e respondo pelos dados carregados aqui (fonte: <strong>' + FONTE_LABEL[state.fonte] + '</strong>). Pergunte por roteiro, comiss\u00E3o, diagn\u00F3stico de campanha, sazonalidade ou nichos, ou use as perguntas r\u00E1pidas ao lado.');
+addMsg('user', 'Qual a comiss\u00E3o por venda do produto selecionado?');
+aiSay(agentAnswer('Qual a comiss\u00E3o por venda do produto selecionado?'));
+addMsg('user', 'Diagn\u00F3stico das campanhas abaixo do ROAS');
+aiSay(agentAnswer('Diagn\u00F3stico das campanhas abaixo do ROAS'));
+navigate();
+
+/* conferências da demonstração (rodando no console) */
+console.assert(agg().gmv === 5739795, 'GMV total da demonstra\u00E7\u00E3o: esperado 5739795');
+console.assert(agg().unidades === 98550, 'Unidades da demonstra\u00E7\u00E3o: esperado 98550');
+console.assert(PRODUCTS.every((p) => p.complaints.reduce((a, c) => a + c[1], 0) === 100), 'Reclama\u00E7\u00F5es devem somar 100% em cada produto');
+console.assert(Math.abs(campAgg().roas - 2.47) < 0.02, 'ROAS m\u00E9dio da demonstra\u00E7\u00E3o: esperado 2,47\u00D7');
+console.assert(failGuard().length === 2, 'Duas campanhas devem acionar a prote\u00E7\u00E3o (c2 e c7)');
+console.assert(CFG_PROVIDERS.length === 8, 'Configura\u00E7\u00F5es: 8 provedores (6 LLMs + SerpAPI + EchoTok)');
+console.assert(LLM_MODELS.every((m) => ['chat', 'codigo', 'imagem', 'tts', 'embedding'].includes(m.tipo)), 'Modelos com tipo v\u00E1lido');
+console.assert(CFG_PROVIDERS.every((p) => CFG_PROVIDERS.filter((x) => x.id === p.id).length === 1), 'IDs de provedor \u00FAnicos');
+</script>
+</body>
+</html>
