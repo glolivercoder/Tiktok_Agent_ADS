@@ -6,6 +6,13 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Carrega .env da raiz do projeto (se existir)
+_env_path = Path(__file__).resolve().parents[2] / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path)
+
 
 class ConfigurationError(RuntimeError):
     """Configuração ausente/inválida (o app não deve iniciar)."""

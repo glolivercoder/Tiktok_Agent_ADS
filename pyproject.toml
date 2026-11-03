@@ -13,6 +13,7 @@ dependencies = [
   "pydantic>=2.11,<3",
   "httpx>=0.28,<1",
   "python-multipart>=0.0.9",
+  "python-dotenv>=1.0,<2",
   "lancedb>=0.21,<1",
   "pyarrow>=18,<22",
 ]

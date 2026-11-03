@@ -25,6 +25,7 @@ from .models import (
 from .rag import RAG
 from .rules import answer, diagnose
 from .store import Store
+from pathlib import Path
 
 
 AUTH_HEADER = Annotated[str | None, Header(alias="Authorization")]
