@@ -1,0 +1,57 @@
+[
+  {
+    "id": "campaign-decision",
+    "name": "Campaign Decision Strategist",
+    "agent": "media",
+    "intents": ["campanha", "roas", "acos", "verba", "pausar", "escalar", "diagnostico", "ads", "produto", "nicho"],
+    "when_to_use": "Quando a pergunta envolve decisão de campanha, ROAS/ACOS, verba, pausa, escala ou escolha de produto/nicho.",
+    "prompt": "Você decide ações de campanha com base nos números da sessão. Regras: (a) 3 dias abaixo do alvo → pausar o pior anúncio do grupo, não o grupo; (b) queda moderada → trocar gancho dos 2s; (c) queda severa (>50% do alvo) → pausar; (d) escalar só +20% após 3 dias no alvo; (e) orçamento >90% usado → verba nova, não lance maior; (f) toda ação com custo real exige aprovação humana. Saída: ação, campanha, motivo numérico, confiança, requer_aprovacao=true. Nunca invente métrica ausente; marque como 'sem dado'.",
+    "max_tokens": 320,
+    "priority": 10,
+    "source": "strategic_skills_80_20.md#1"
+  },
+  {
+    "id": "creative-hook",
+    "name": "Creative Hook Scientist",
+    "agent": "creative",
+    "intents": ["roteiro", "gancho", "hook", "video", "legenda", "caption", "criativo", "15s"],
+    "when_to_use": "Quando a pergunta pede roteiro, gancho, legenda ou variação de criativo.",
+    "prompt": "Gere 3 ganchos de 2s para o produto, cada um com um ângulo diferente (dor, curiosidade, prova social). O corpo do roteiro é fixo: problema 3-7s, prova 8-12s, CTA 13-15s. Não invente benefício fora do contexto do produto. Inclua a keyword principal falada e on-screen. Saída: gancho + keyword + hipótese de retenção.",
+    "max_tokens": 280,
+    "priority": 9,
+    "source": "strategic_skills_80_20.md#2"
+  },
+  {
+    "id": "compliance",
+    "name": "Compliance & Account Safety",
+    "agent": "media",
+    "intents": ["compliance", "proibido", "termo", "aprovacao", "banimento", "suspensao", "copy", "anuncio", "politica"],
+    "when_to_use": "Quando houver copy, criativo, anúncio ou dúvida sobre termo permitido.",
+    "prompt": "Antes de publicar, valide o criativo/copy contra a lista de termos proibidos (saúde, adulto, armas, drogas, financeiro/golpe, política/ódio, IP, misinformation). Exija: relação de afiliado declarada, música licenciada, sem antes/depois, sem urgência falsa, produto com estoque. Se houver dúvida, reprove. Saída: aprovado/reprovado + termo + correção sugerida.",
+    "max_tokens": 260,
+    "priority": 8,
+    "source": "strategic_skills_80_20.md#3"
+  },
+  {
+    "id": "seo",
+    "name": "TikTok SEO & Discovery",
+    "agent": "creative",
+    "intents": ["seo", "keyword", "hashtag", "busca", "descobrir", "indexacao"],
+    "when_to_use": "Quando a pergunta envolve alcance orgânico, hashtags, keyword ou busca no TikTok.",
+    "prompt": "Escolha 1 keyword principal + 2 secundárias com intenção de compra. Caption: keyword no gancho + benefício + CTA + 3-5 hashtags (1 broad, 2 niche, 1 branded). Coloque a keyword no texto on-screen dos 3s e fale em voz alta. Para Ads: 5-15 keywords de targeting + negative keywords. Nunca keyword stuffing (>8 hashtags).",
+    "max_tokens": 240,
+    "priority": 7,
+    "source": "strategic_skills_80_20.md#4"
+  },
+  {
+    "id": "feedback-loop",
+    "name": "Feedback Loop Analyst",
+    "agent": "analytics",
+    "intents": ["resultado", "feedback", "aprendizado", "padrao", "historico", "decisao", "caso"],
+    "when_to_use": "Quando a pergunta pede análise de resultados passados ou padrões de decisão.",
+    "prompt": "Leia as decisões registradas (campanha, métricas, ação, resultado 3/7d). Encontre padrões: quais ações funcionaram por tipo de campanha/nicho. Produza 3 regras acionáveis no formato 'se X então Y' com evidência (nº de casos). Não generalize com menos de 3 casos; marque como hipótese.",
+    "max_tokens": 220,
+    "priority": 6,
+    "source": "strategic_skills_80_20.md#5"
+  }
+]

@@ -9,7 +9,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .models import CampaignIn, CampaignOut, DecisionIn, DecisionOut
+from .models import (
+    CampaignIn,
+    CampaignOut,
+    DecisionIn,
+    DecisionOut,
+    SessionSyncRequest,
+)
 
 
 def _now() -> str:
@@ -93,6 +99,19 @@ class Store:
                 "INSERT INTO sessions(payload,created_at) VALUES(?,?)",
                 (json.dumps(payload, ensure_ascii=False), _now()),
             )
+
+    def load_last_session(self) -> SessionSyncRequest | None:
+        """Última sessão salva (usada quando /chat não recebe session)."""
+        with self._conn() as c:
+            row = c.execute(
+                "SELECT payload FROM sessions ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+        if not row:
+            return None
+        try:
+            return SessionSyncRequest(**json.loads(row["payload"]))
+        except Exception:
+            return None
 
     def record_decision(self, d: DecisionIn) -> DecisionOut:
         with self._conn() as c:

@@ -38,6 +38,23 @@ def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
     return value
 
 
+def _env_float(name: str, default: float, minimum: float, maximum: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise ConfigurationError(f"{name} deve ser numérico") from exc
+    if not minimum <= value <= maximum:
+        raise ConfigurationError(f"{name} deve estar entre {minimum} e {maximum}")
+    return value
+
+
+def _env_str(name: str, default: str) -> str:
+    return os.environ.get(name, default).strip() or default
+
+
 def _env_path(name: str, default: Path) -> Path:
     raw = os.environ.get(name, "").strip()
     return Path(raw).expanduser() if raw else default
@@ -57,6 +74,17 @@ class Settings:
     embedding_dim: int = 384
     max_rag_hits: int = 5
     allow_unauthenticated_health: bool = True
+    # LLM (OmniRoute primeiro, OpenRouter como fallback)
+    llm_enabled: bool = True
+    llm_timeout_s: float = 20.0
+    llm_max_tokens: int = 700
+    llm_temperature: float = 0.4
+    omni_base_url: str = "http://localhost:20128/v1"
+    omni_api_key: str = ""
+    omni_model: str = "auto/best-free"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_api_key: str = ""
+    openrouter_model: str = "openrouter/auto"
 
     @classmethod
     def from_env(cls, data_dir: Path | None = None) -> "Settings":
@@ -90,6 +118,18 @@ class Settings:
             embedding_dim=_env_int("ECHOTIK_EMBED_DIM", 384, 64, 1536),
             max_rag_hits=_env_int("ECHOTIK_MAX_RAG_HITS", 5, 1, 20),
             allow_unauthenticated_health=_env_bool("ECHOTIK_OPEN_HEALTH", True),
+            llm_enabled=_env_bool("ECHOTIK_LLM_ENABLED", True),
+            llm_timeout_s=_env_float("ECHOTIK_LLM_TIMEOUT", 20.0, 1.0, 120.0),
+            llm_max_tokens=_env_int("ECHOTIK_LLM_MAX_TOKENS", 700, 64, 4096),
+            llm_temperature=_env_float("ECHOTIK_LLM_TEMPERATURE", 0.4, 0.0, 2.0),
+            omni_base_url=_env_str("OMNIROUTE_BASE_URL", "http://localhost:20128/v1"),
+            omni_api_key=os.environ.get("OMNIROUTE_API_KEY", "").strip(),
+            omni_model=_env_str("OMNIROUTE_MODEL", "auto/best-free"),
+            openrouter_base_url=_env_str(
+                "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
+            ),
+            openrouter_api_key=os.environ.get("OPENROUTER_API_KEY", "").strip(),
+            openrouter_model=_env_str("OPENROUTER_MODEL", "openrouter/auto"),
         )
 
 

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import hmac
-import json
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from .config import Settings
+from .llm import LLMClient
 from .models import (
     ChatRequest,
     ChatResponse,
@@ -23,23 +24,30 @@ from .models import (
     SessionSyncRequest,
 )
 from .rag import RAG
-from .rules import answer, diagnose
+from .rules import answer, diagnose, fail_guard
+from .skills import build_system_prompt, build_user_prompt, catalog_public, select_skills
 from .store import Store
-from pathlib import Path
 
 
 AUTH_HEADER = Annotated[str | None, Header(alias="Authorization")]
 
 
-def create_app(settings: Settings | None = None, store: Store | None = None, rag: RAG | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    store: Store | None = None,
+    rag: RAG | None = None,
+    llm: object | None = None,
+) -> FastAPI:
     cfg = settings or __import__("echotik_agent.config", fromlist=["load_settings"]).load_settings()
     st = store or Store(cfg.sqlite_path)
     rg = rag or RAG(cfg.lancedb_path, dim=cfg.embedding_dim)
+    client = llm if llm is not None else LLMClient(cfg)
 
     app = FastAPI(title="hermes-echotik-agent", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.settings = cfg
     app.state.store = st
     app.state.rag = rg
+    app.state.llm = client
 
     def require_token(authorization: AUTH_HEADER = None) -> None:
         if not authorization or not authorization.startswith("Bearer "):
@@ -56,7 +64,13 @@ def create_app(settings: Settings | None = None, store: Store | None = None, rag
     async def health() -> dict:
         if not cfg.allow_unauthenticated_health:
             require_token()
-        return {"status": "ok", "service": "echotik-agent", "version": "0.1.0"}
+        return {
+            "status": "ok",
+            "service": "echotik-agent",
+            "version": "0.1.0",
+            "llm": bool(getattr(client, "available", False)),
+            "skills": len(catalog_public()),
+        }
 
     @app.post("/campaigns")
     async def upsert_campaigns(body: list[dict], _: None = Depends(require_token)) -> list:
@@ -86,17 +100,42 @@ def create_app(settings: Settings | None = None, store: Store | None = None, rag
 
     @app.post("/chat", response_model=ChatResponse)
     async def chat(body: ChatRequest, _: None = Depends(require_token)) -> ChatResponse:
-        session = body.session
-        if session is None:
-            # tenta última sessão salva não disponível; usa vazio
-            session = SessionSyncRequest()
+        session = body.session or st.load_last_session() or SessionSyncRequest()
         rag_hits = []
         if body.use_rag:
             rag_hits = rg.query(body.message, collection="personas", limit=body.limit)
             if not rag_hits:
                 rag_hits = rg.query(body.message, collection="research", limit=body.limit)
+
+        selected = select_skills(body.message)
+        skills_used = [str(s.get("id")) for s in selected]
+        fails = fail_guard(session.campaigns)
+
+        if body.use_llm and getattr(client, "available", False):
+            messages = [
+                {"role": "system", "content": build_system_prompt(selected)},
+                {"role": "user", "content": build_user_prompt(body.message, session, rag_hits)},
+            ]
+            result = await client.complete(messages)
+            if result:
+                return ChatResponse(
+                    reply=result.text,
+                    mode="llm",
+                    skills_used=skills_used,
+                    llm_provider=result.provider,
+                    llm_model=result.model,
+                    rag_hits=rag_hits,
+                    fails=fails,
+                )
+
         resp = answer(body.message, session, rag_hits)
+        resp.skills_used = skills_used
         return resp
+
+    @app.get("/skills")
+    async def skills(_: None = Depends(require_token)) -> dict:
+        catalog = catalog_public()
+        return {"ok": True, "count": len(catalog), "skills": catalog}
 
     @app.post("/diagnose", response_model=DiagnoseResponse)
     async def diag(body: DiagnoseRequest, _: None = Depends(require_token)) -> DiagnoseResponse:

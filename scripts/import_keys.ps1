@@ -69,8 +69,7 @@ foreach ($f in $omFiles) {
 
 # Gemini
 $gemFiles = @(
-    "$SourceRoot\Geminicloud_todoCalendar\GeminiAPIGcoder.txt",
-    "$SourceRoot\Geminicloud_todoCalendar\AIzaSyA_snVzHG2IkEIpXs_XGUg_QY5sBQb.txt"
+    "$SourceRoot\Geminicloud_todoCalendar\GeminiAPIGcoder.txt"
 )
 foreach ($f in $gemFiles) {
     $k = Get-KeyFromFile $f
@@ -147,6 +146,18 @@ if (-not $keys.ContainsKey('ECHOTIK_AGENT_TOKEN')) {
     Write-Host "ECHOTIK_AGENT_TOKEN: gerado localmente (32 hex)" -ForegroundColor Yellow
 }
 
+# Defaults não-secretos do roteamento LLM (OmniRoute local + fallback OpenRouter)
+$defaults = [ordered]@{
+    'ECHOTIK_LLM_ENABLED'   = 'true'
+    'OMNIROUTE_BASE_URL'    = 'http://localhost:20128/v1'
+    'OMNIROUTE_MODEL'       = 'auto/best-free'
+    'OPENROUTER_BASE_URL'   = 'https://openrouter.ai/api/v1'
+    'OPENROUTER_MODEL'      = 'openrouter/auto'
+}
+foreach ($kv in $defaults.GetEnumerator()) {
+    if (-not $keys.ContainsKey($kv.Key)) { $keys[$kv.Key] = $kv.Value }
+}
+
 # Escreve .env
 $envLines = @("# Chaves de API importadas em $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')", "")
 foreach ($kv in $keys.GetEnumerator() | Sort-Object Name) {
@@ -154,7 +165,7 @@ foreach ($kv in $keys.GetEnumerator() | Sort-Object Name) {
 }
 
 Set-Content -Path $DestEnv -Value ($envLines -join "`n") -NoNewline -Force
-Write-Host "`n✅ .env criado: $DestEnv ($($keys.Count) chaves)" -ForegroundColor Green
+Write-Host "`n✅ .env criado: $DestEnv ($($keys.Count) entradas)" -ForegroundColor Green
 
 # Confirma que está no .gitignore
 $gitIgnoreCheck = & git -C (Split-Path $DestEnv -Parent) check-ignore .env 2>&1
@@ -165,8 +176,7 @@ if ($gitIgnoreCheck -like '*.env*') {
 }
 
 Write-Host "`n=== Próximos passos ===`n" -ForegroundColor Cyan
-Write-Host "1. Adicione 'python-dotenv' ao pyproject.toml"
-Write-Host "2. Carregue .env no config.py com dotenv.load_dotenv()"
-Write-Host "3. Implemente cliente LLM no /chat (OmniRoute/OpenRouter)"
-Write-Host "4. Implemente embeddings semânticos (Gemini/OpenAI)"
-Write-Host "5. Rotacione as chaves expostas no nome do arquivo (renomeie primeiro)`n"
+Write-Host "1. uv sync --frozen"
+Write-Host "2. uv run --frozen uvicorn echotik_agent.main:create_app --factory --host 127.0.0.1 --port 5077"
+Write-Host "3. Teste: GET /health e POST /chat (mode=llm quando OmniRoute estiver no ar)"
+Write-Host "4. Rotacione as chaves que estavam expostas no nome do arquivo`n"

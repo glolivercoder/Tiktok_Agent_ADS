@@ -97,6 +97,7 @@ class ChatRequest(ApiModel):
     message: str = Field(min_length=1, max_length=4000)
     session: SessionSyncRequest | None = None
     use_rag: bool = True
+    use_llm: bool = True
     limit: int = Field(default=5, ge=1, le=20)
 
 
@@ -112,6 +113,9 @@ class ChatResponse(ApiModel):
     ok: bool = True
     reply: str
     mode: str = "rules"
+    skills_used: list[str] = Field(default_factory=list)
+    llm_provider: str | None = None
+    llm_model: str | None = None
     suggestions: list[Suggestion] = Field(default_factory=list)
     rag_hits: list[dict[str, Any]] = Field(default_factory=list)
     untrusted: bool = True
