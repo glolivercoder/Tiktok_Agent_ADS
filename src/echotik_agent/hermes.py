@@ -33,11 +33,13 @@ class HermesClient:
         market_url: str = "http://127.0.0.1:5022",
         token: str = "",
         timeout_s: float = 15.0,
+        market_timeout_s: float = 90.0,
     ) -> None:
         self.research_url = research_url.rstrip("/")
         self.market_url = market_url.rstrip("/")
         self.token = token
         self.timeout = timeout_s
+        self.market_timeout = market_timeout_s
         self._headers = {"Accept": "application/json", "Content-Type": "application/json"}
         if token:
             self._headers["Authorization"] = f"Bearer {token}"
@@ -47,11 +49,12 @@ class HermesClient:
     def available(self) -> bool:
         return bool(self.research_url) or bool(self.market_url)
 
-    async def _post(self, base_url: str, path: str, json_body: dict[str, Any]) -> HermesResult:
+    async def _post(self, base_url: str, path: str, json_body: dict[str, Any], use_market_timeout: bool = False) -> HermesResult:
         if not base_url:
             return HermesResult(ok=False, error="URL não configurada", status=503)
+        timeout = self.market_timeout if use_market_timeout else self.timeout
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.post(
                     f"{base_url}{path}",
                     json=json_body,
@@ -164,7 +167,7 @@ class HermesClient:
         }
         if project_id:
             body["projectId"] = project_id
-        return await self._post(self.market_url, "/api/market/analyze", body)
+        return await self._post(self.market_url, "/api/market/analyze", body, use_market_timeout=True)
 
     async def market_reports(self) -> HermesResult:
         """Lista relatórios de mercado (GET /api/market/reports)."""

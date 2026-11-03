@@ -64,6 +64,7 @@ def create_app(
         market_url=cfg.hermes_market_url,
         token=cfg.hermes_token,
         timeout_s=cfg.hermes_timeout_s,
+        market_timeout_s=cfg.hermes_market_timeout_s,
     )
 
     app = FastAPI(title="hermes-echotik-agent", version="0.1.0", docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json", redirect_slashes=False)

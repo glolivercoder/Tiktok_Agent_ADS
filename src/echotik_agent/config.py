@@ -72,6 +72,7 @@ class Settings:
     hermes_market_url: str = "http://127.0.0.1:5022"
     hermes_token: str = ""
     hermes_timeout_s: float = 15.0
+    hermes_market_timeout_s: float = 90.0
     agency_agents_dir: Path | None = None
     embedding_dim: int = 384
     embedding_provider: str = "hash"
@@ -175,6 +176,7 @@ class Settings:
             echotok_timeout_s=_env_float("ECHOTIK_API_TIMEOUT", 15.0, 1.0, 60.0),
             echotok_daily_limit=_env_int("ECHOTIK_API_DAILY_LIMIT", 50, 1, 10_000),
             hermes_timeout_s=_env_float("HERMES_HTTP_TIMEOUT", 15.0, 1.0, 60.0),
+            hermes_market_timeout_s=_env_float("HERMES_MARKET_TIMEOUT", 90.0, 10.0, 300.0),
             max_rag_hits=_env_int("ECHOTIK_MAX_RAG_HITS", 5, 1, 20),
             allow_unauthenticated_health=_env_bool("ECHOTIK_OPEN_HEALTH", True),
             llm_enabled=_env_bool("ECHOTIK_LLM_ENABLED", True),
