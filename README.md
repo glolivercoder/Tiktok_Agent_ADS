@@ -32,6 +32,13 @@ uv run --frozen pytest
 - `HERMES_SECRETS_URL` (default 5011), `HERMES_RESEARCH_URL` (5021), `HERMES_MARKET_URL` (5022), `HERMES_HTTP_TOKEN`.
 - `AGENCY_AGENTS_DIR` aponta para o clone de `Agency_agents` para seed de personas (`POST /seed/personas`).
 
+## Segurança
+
+- `.env` fica fora do Git (`.gitignore`); o repositório só versiona `.env.example` sem valores.
+- O script de importação imprime apenas provedor + tamanho + 4 últimos caracteres.
+- Chaves nunca entram no SQLite, no LanceDB/RAG nem nas respostas da API.
+- Se uma chave apareceu em log, histórico de Git ou nome de arquivo, **rotacione** no painel do provedor e rode o script de importação de novo.
+
 ## Isolamento
 
 Projeto independente; pode ser versionado em repositório próprio (https://github.com/glolivercoder/Tiktok_Agent_ADS).

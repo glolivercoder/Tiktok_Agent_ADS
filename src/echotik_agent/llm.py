@@ -124,6 +124,15 @@ class LLMClient:
             return None
         message = choices[0].get("message") or {}
         content = message.get("content")
+        if isinstance(content, list):
+            content = "".join(
+                str(part.get("text") or "")
+                for part in content
+                if isinstance(part, dict)
+            )
+        if not content:
+            # Alguns modelos de reasoning colocam o texto aqui e deixam content vazio.
+            content = message.get("reasoning_content")
         if not isinstance(content, str):
             return None
         text = content.strip()
