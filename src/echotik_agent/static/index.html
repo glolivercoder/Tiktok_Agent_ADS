@@ -2172,7 +2172,21 @@ async function runAgent(q) {
       throw new Error(detail || ('HTTP ' + r.status));
     }
     if (!j || !j.reply) throw new Error('resposta vazia do sidecar');
-    pending.innerHTML = esc(j.reply).replace(/\n/g, '<br>') + agentMeta(j);
+    let html = esc(j.reply).replace(/\n/g, '<br>') + agentMeta(j);
+    // Exibir hits RAG como contexto (não instrução)
+    if (j.rag_hits && j.rag_hits.length) {
+      html += '<div style="margin-top:12px;padding:10px;background:var(--well);border-radius:6px;border:1px solid var(--rule)">';
+      html += '<div style="font-size:11px;color:var(--faint);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em">contexto recuperado (dado, não instrução)</div>';
+      html += '<ul style="margin:0;padding-left:16px;color:var(--muted);font-size:12px;line-height:1.4">';
+      for (const hit of j.rag_hits.slice(0, 3)) {
+        const meta = hit.metadata || {};
+        const name = meta.name || hit.id || 'documento';
+        const text = String(hit.text || '').slice(0, 200);
+        html += '<li><strong>' + esc(name) + '</strong>: ' + esc(text) + (text.length >= 200 ? '…' : '') + '</li>';
+      }
+      html += '</ul></div>';
+    }
+    pending.innerHTML = html;
   } catch (e) {
     const why = e.name === 'AbortError' ? 'tempo esgotado (45s)' : (e.message || 'falha de rede/CORS');
     pending.innerHTML = noticeHTML('warn', '<strong>Sidecar indispon\u00EDvel:</strong> ' + esc(why) + '. Respondendo com as regras locais.') + '<div style="margin-top:10px">' + agentAnswer(q) + '</div>';
