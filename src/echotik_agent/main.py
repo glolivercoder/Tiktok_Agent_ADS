@@ -6,8 +6,14 @@ import asyncio
 import hashlib
 import hmac
 import logging
+import sys
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+logger = logging.getLogger("echotik.agent")
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any, Optional
@@ -251,6 +257,10 @@ def create_app(
         _: None = Depends(require_token),
     ) -> EchoTokImportResponse:
         if not getattr(tok, "available", False):
+            logger.warning(
+                "echotok.import.nao_configurado",
+                extra={"evento": "echotok.import.nao_configurado", "ip": request.client.host if request.client else "local"},
+            )
             raise HTTPException(
                 status_code=503,
                 detail={
@@ -258,6 +268,18 @@ def create_app(
                     "message": "defina ECHOTOK_API_KEY ou ECHOTOK_API_USER/ECHOTOK_API_PASSWORD no .env do sidecar",
                 },
             )
+
+        logger.info(
+            "echotok.import.iniciado",
+            extra={
+                "evento": "echotok.import.iniciado",
+                "regiao": body.region,
+                "pagina": body.page_num,
+                "tamanho_pagina": body.page_size,
+                "categoria_id": body.category_id,
+                "ip": request.client.host if request.client else "local",
+            },
+        )
 
         limit, used = consume_echotok()
         try:
@@ -278,10 +300,33 @@ def create_app(
                     categories = {}
             products = tok.normalize_products(raw_items, categories)
         except EchoTokError as exc:
+            logger.error(
+                "echotok.import.erro",
+                extra={
+                    "evento": "echotok.import.erro",
+                    "regiao": body.region,
+                    "pagina": body.page_num,
+                    "erro": str(exc),
+                    "ip": request.client.host if request.client else "local",
+                },
+            )
             raise HTTPException(
                 status_code=exc.status,
                 detail={"error": "ECHOTOK_ERROR", "message": str(exc)},
             ) from exc
+
+        logger.info(
+            "echotok.import.concluido",
+            extra={
+                "evento": "echotok.import.concluido",
+                "regiao": body.region,
+                "pagina": body.page_num,
+                "produtos_importados": len(products),
+                "cota_usada": used,
+                "cota_limite": limit,
+                "ip": request.client.host if request.client else "local",
+            },
+        )
 
         audit_request(
             request,
@@ -369,27 +414,57 @@ def create_app(
     async def chat(body: ChatRequest, request: Request, _: None = Depends(require_token)) -> ChatResponse:
         session = body.session or st.load_last_session() or SessionSyncRequest()
         if body.session is not None:
-            # O Hub manda a sessão a cada pergunta; persistir mantém /diagnose e
-            # a próxima conversa coerentes mesmo sem /session/sync explícito.
             st.upsert_campaigns(body.session.campaigns)
             st.save_session(body.session.model_dump())
+
+        logger.info(
+            "chat.recebida",
+            extra={
+                "evento": "chat.recebida",
+                "mensagem": body.message[:200],
+                "use_rag": body.use_rag,
+                "use_llm": body.use_llm,
+                "limite": body.limit,
+                "campanhas": len(session.campaigns),
+                "fonte": session.fonte,
+                "ip": request.client.host if request.client else "local",
+            },
+        )
+
         rag_hits = []
         if body.use_rag:
             rag_hits = rg.query(body.message, collection="personas", limit=body.limit)
             if not rag_hits:
                 rag_hits = rg.query(body.message, collection="research", limit=body.limit)
             if not rag_hits:
-                # Contexto semântico das skills ingeridas no boot (2 hits curtos).
                 rag_hits = rg.query(
                     body.message,
                     collection="skills",
                     limit=min(body.limit, 2),
                 )
+            logger.info(
+                "chat.rag_consultado",
+                extra={
+                    "evento": "chat.rag_consultado",
+                    "hits": len(rag_hits),
+                    "colecoes": ["personas", "research", "skills"],
+                },
+            )
 
         selected = select_skills(body.message)
         skills_used = [str(s.get("id")) for s in selected]
         fails = fail_guard(session.campaigns)
 
+        logger.info(
+            "chat.selecionando_skills",
+            extra={
+                "evento": "chat.selecionando_skills",
+                "skills": skills_used,
+                "fails": [c.id for c in fails],
+            },
+        )
+
+        modo = "rules"
         if body.use_llm and getattr(client, "available", False):
             messages = [
                 {"role": "system", "content": build_system_prompt(selected)},
@@ -397,9 +472,10 @@ def create_app(
             ]
             result = await client.complete(messages)
             if result:
+                modo = "llm"
                 resp = ChatResponse(
                     reply=result.text,
-                    mode="llm",
+                    mode=modo,
                     skills_used=skills_used,
                     llm_provider=result.provider,
                     llm_model=result.model,
@@ -412,6 +488,19 @@ def create_app(
         else:
             resp = answer(body.message, session, rag_hits)
             resp.skills_used = skills_used
+
+        logger.info(
+            "chat.respondida",
+            extra={
+                "evento": "chat.respondida",
+                "modo": resp.mode,
+                "skills_usadas": resp.skills_used,
+                "provedor_llm": resp.llm_provider,
+                "modelo_llm": resp.llm_model,
+                "tamanho_resposta": len(resp.reply or ""),
+                "fails": len(fails),
+            },
+        )
 
         audit_request(
             request,
@@ -433,14 +522,33 @@ def create_app(
         return {"ok": True, "count": len(catalog), "skills": catalog}
 
     @app.post("/diagnose", response_model=DiagnoseResponse)
-    async def diag(body: DiagnoseRequest, _: None = Depends(require_token)) -> DiagnoseResponse:
+    async def diag(body: DiagnoseRequest, request: Request, _: None = Depends(require_token)) -> DiagnoseResponse:
         session = body.session or SessionSyncRequest()
         if body.campaign_id:
             session.campaigns = [c for c in session.campaigns if c.id == body.campaign_id]
+        logger.info(
+            "diagnose.executado",
+            extra={
+                "evento": "diagnose.executado",
+                "campanha_id": body.campaign_id,
+                "campanhas_analisadas": len(session.campaigns),
+                "ip": request.client.host if request.client else "local",
+            },
+        )
         return diagnose(session)
 
     @app.post("/decisions", response_model=DecisionOut)
     async def record_decision(body: DecisionIn, request: Request, _: None = Depends(require_token)) -> DecisionOut:
+        logger.info(
+            "decisao.registrada",
+            extra={
+                "evento": "decisao.registrada",
+                "campanha_id": body.campaign_id,
+                "acao": body.action.value,
+                "aprovado": body.approved,
+                "ip": request.client.host if request.client else "local",
+            },
+        )
         out = st.record_decision(body)
         audit_request(
             request,

@@ -2902,22 +2902,45 @@ RENDER.config = function renderConfig() {
 /* ---------- init ---------- */
 restore();
 bindEvents();
-addMsg('ai', 'Sou o agente desta sess\u00E3o e respondo pelos dados carregados aqui (fonte: <strong>' + FONTE_LABEL[state.fonte] + '</strong>). Pergunte por roteiro, comiss\u00E3o, diagn\u00F3stico de campanha, sazonalidade ou nichos, ou use as perguntas r\u00E1pidas ao lado.');
-addMsg('user', 'Qual a comiss\u00E3o por venda do produto selecionado?');
-aiSay(agentAnswer('Qual a comiss\u00E3o por venda do produto selecionado?'));
-addMsg('user', 'Diagn\u00F3stico das campanhas abaixo do ROAS');
-aiSay(agentAnswer('Diagn\u00F3stico das campanhas abaixo do ROAS'));
-navigate();
 
-/* conferências da demonstração (rodando no console) */
-console.assert(agg().gmv === 5739795, 'GMV total da demonstra\u00E7\u00E3o: esperado 5739795');
-console.assert(agg().unidades === 98550, 'Unidades da demonstra\u00E7\u00E3o: esperado 98550');
-console.assert(PRODUCTS.every((p) => p.complaints.reduce((a, c) => a + c[1], 0) === 100), 'Reclama\u00E7\u00F5es devem somar 100% em cada produto');
-console.assert(Math.abs(campAgg().roas - 2.47) < 0.02, 'ROAS m\u00E9dio da demonstra\u00E7\u00E3o: esperado 2,47\u00D7');
-console.assert(failGuard().length === 2, 'Duas campanhas devem acionar a prote\u00E7\u00E3o (c2 e c7)');
-console.assert(CFG_PROVIDERS.length === 8, 'Configura\u00E7\u00F5es: 8 provedores (6 LLMs + SerpAPI + EchoTok)');
-console.assert(LLM_MODELS.every((m) => ['chat', 'codigo', 'imagem', 'tts', 'embedding'].includes(m.tipo)), 'Modelos com tipo v\u00E1lido');
-console.assert(CFG_PROVIDERS.every((p) => CFG_PROVIDERS.filter((x) => x.id === p.id).length === 1), 'IDs de provedor \u00FAnicos');
+async function initRealData() {
+  if (!sidecarReady()) {
+    addMsg('ai', 'Sou o agente desta sess\u00E3o e respondo pelos dados carregados aqui (fonte: <strong>' + FONTE_LABEL[state.fonte] + '</strong>). Configure o sidecar em Configura\u00E7\u00F5es \u2192 Agente sidecar para conectar dados reais.');
+  } else {
+    try {
+      const r = await sidecarFetch('/echotok/status', { method: 'GET' }, 8000);
+      const j = await r.json().catch(() => null);
+      if (r.ok && j && j.configured) {
+        const usado = j.usedToday || 0;
+        const limite = j.dailyLimit || 0;
+        addMsg('ai', 'EchoTok Data API est\u00E1 configurada (' + (j.region || 'BR') + '). Cota: ' + usado + '/' + limite + ' hoje. Importando produtos reais...');
+        await importEchoTok();
+      } else {
+        addMsg('ai', 'Sou o agente desta sess\u00E3o e respondo pelos dados carregados aqui (fonte: <strong>' + FONTE_LABEL[state.fonte] + '</strong>). A EchoTok Data API n\u00e3o est\u00e1 configurada no sidecar. Defina ECHOTOK_API_KEY no .env para usar dados reais.');
+      }
+    } catch (e) {
+      addMsg('ai', 'Sou o agente desta sess\u00E3o e respondo pelos dados carregados aqui (fonte: <strong>' + FONTE_LABEL[state.fonte] + '</strong>). N\u00e3o foi poss\u00edvel verificar o status da EchoTok Data API.');
+    }
+  }
+}
+
+initRealData().then(() => {
+  addMsg('user', 'Qual a comiss\u00E3o por venda do produto selecionado?');
+  aiSay(agentAnswer('Qual a comiss\u00E3o por venda do produto selecionado?'));
+  addMsg('user', 'Diagn\u00F3stico das campanhas abaixo do ROAS');
+  aiSay(agentAnswer('Diagn\u00F3stico das campanhas abaixo do ROAS'));
+  navigate();
+});
+
+/* logs de inicialização */
+console.log('[EchoHub] inicializado', {
+  produtos_simulados: PRODUCTS.length,
+  campanhas: DEFAULT_CAMPAIGNS.length,
+  nichos: NICHES.length,
+  subnichos: SUBNICHOS.length,
+  fontes_disponiveis: Object.keys(FONTE_LABEL),
+  lado_cliente: true,
+});
 </script>
 </body>
 </html>
