@@ -1034,6 +1034,20 @@ td .actions { display: flex; gap: 8px; justify-content: flex-end; align-items: c
           <p class="hint" style="margin-top:10px" id="cfgCalcNota"></p>
         </div>
       </div>
+
+      <div class="setrow">
+        <div>
+          <h2>Histórico de Decisões (HITL)</h2>
+          <p class="desc">Trilha de auditoria das decisões de campanha registradas via <code>POST /decisions</code>. Cada decisão requer aprovação humana explícita.</p>
+        </div>
+        <div class="panel">
+          <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+            <button class="btn" type="button" id="btnLoadDecisions">Carregar decisões</button>
+            <span id="decisionsCount" class="chip" style="margin-left:auto"></span>
+          </div>
+          <div id="decisionsList" style="display:grid;gap:8px"></div>
+        </div>
+      </div>
     </section>
 
   </main>
@@ -2564,6 +2578,22 @@ function bindEvents() {
       toast('Falha ao carregar skills: ' + esc(why));
     }
   });
+  $('#btnLoadDecisions').addEventListener('click', async () => {
+    if (!sidecarReady()) {
+      toast('Configure o sidecar em Configurações → Agente sidecar.');
+      return;
+    }
+    try {
+      const r = await sidecarFetch('/decisions', { method: 'GET' }, 10000);
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) throw new Error('Falha ao carregar decisões');
+      renderDecisions(j || []);
+      $('#decisionsCount').textContent = `${Array.isArray(j) ? j.length : 0} decisões`;
+    } catch (e) {
+      const why = /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
+      toast('Falha ao carregar decisões: ' + esc(why));
+    }
+  });
   $('#cfgCalcP').addEventListener('change', () => {
     state.config.calc.p = $('#cfgCalcP').value;
     state.config.calc.m = (cfgModelsFor(state.config.calc.p)[0] || {}).id || '';
@@ -2843,6 +2873,23 @@ function renderSkills(skills) {
   el.innerHTML = skills.map((s) =>
     `<div class="rows"><div class="row"><span class="grow"><span class="name">${esc(s.name || s.id)}</span><span class="sub2">${esc(s.whenToUse || '')} \u00B7 intents: ${(s.intents || []).join(', ')}</span></span>` +
     `<span class="chip">${esc(s.agent || '—')}</span></div></div>`).join('');
+}
+
+function renderDecisions(decisions) {
+  const el = $('#decisionsList');
+  if (!decisions || !decisions.length) {
+    el.innerHTML = '<div class="empty">Nenhuma decisão registrada.</div>';
+    return;
+  }
+  const STATUS_PILL = { pausar: 'neg', reforcar: 'pos', trocar_criativo: 'warn', reduzir_lance: 'warn', escalar: 'pos', aguardar: 'neutral', outro: 'neutral' };
+  el.innerHTML = decisions.map((d) => {
+    const aprovado = d.aprovado === true ? 'positivo' : d.aprovado === false ? 'rejeitado' : 'pendente';
+    const pillAprov = aprovado === 'positivo' ? 'pill pos' : aprovado === 'rejeitado' ? 'pill neg' : 'pill neutral';
+    const actionPill = STATUS_PILL[d.action] || 'pill neutral';
+    return `<div class="rows"><div class="row"><span class="grow"><span class="name">${esc(d.campaign_id || '—')}</span><span class="sub2">${esc(d.action)} \u00B7 ${esc(d.reason || '')}</span></span>` +
+      `<span class="${pillAprov}">${aprovado}</span><span class="${actionPill}">${esc(d.action)}</span>` +
+      `<span class="chip">${esc(d.created_at || '')}</span></div></div>`;
+  }).join('');
 }
 
 async function cfgTestEchoTok(pid, stSet) {
