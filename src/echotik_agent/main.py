@@ -265,7 +265,7 @@ def create_app(
                 status_code=503,
                 detail={
                     "error": "ECHOTOK_NOT_CONFIGURED",
-                    "message": "defina ECHOTOK_API_KEY ou ECHOTOK_API_USER/ECHOTOK_API_PASSWORD no .env do sidecar",
+                    "message": "defina ECHOTIK_USERNAME e ECHOTIK_PASSWORD no .env do sidecar",
                 },
             )
 
@@ -283,7 +283,8 @@ def create_app(
 
         limit, used = consume_echotok()
         try:
-            raw_items, request_id = await tok.product_list(
+            raw_items, request_id = await tok.product_search(
+                sk=None,
                 region=body.region,
                 page_size=body.page_size,
                 page_num=body.page_num,

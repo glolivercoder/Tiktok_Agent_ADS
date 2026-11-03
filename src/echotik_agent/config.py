@@ -166,12 +166,14 @@ class Settings:
             gemini_api_key=gemini_key,
             openai_api_key=openai_key,
             openai_base_url=_env_str("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-            echotok_base_url=_env_str(
-                "ECHOTIK_API_BASE_URL", "https://open.echotik.live/api/v3"
-            ),
+            echotok_base_url=_env_str("ECHOTIK_BASE_URL", "https://open.echotik.live"),
             echotok_api_key=os.environ.get("ECHOTOK_API_KEY", "").strip(),
-            echotok_api_user=os.environ.get("ECHOTOK_API_USER", "").strip(),
-            echotok_api_password=os.environ.get("ECHOTOK_API_PASSWORD", "").strip(),
+            echotok_api_user=os.environ.get(
+                "ECHOTIK_USERNAME", os.environ.get("ECHOTOK_API_USER", "")
+            ).strip(),
+            echotok_api_password=os.environ.get(
+                "ECHOTIK_PASSWORD", os.environ.get("ECHOTOK_API_PASSWORD", "")
+            ).strip(),
             echotok_region=_env_str("ECHOTIK_REGION", "BR"),
             echotok_timeout_s=_env_float("ECHOTIK_API_TIMEOUT", 15.0, 1.0, 60.0),
             echotok_daily_limit=_env_int("ECHOTIK_API_DAILY_LIMIT", 50, 1, 10_000),
