@@ -358,28 +358,28 @@ class FakeHermes(HermesClient):
     available = True
 
     def __init__(self) -> None:
-        super().__init__(research_url="http://fake", market_url="http://fake")
+        self.region = "BR"
         self.calls: list[tuple] = []
 
     async def research(self, q: str, **kwargs):
         self.calls.append(("research", q, kwargs))
         return HermesResult(ok=True, data={"results": [{"title": "Fake result", "url": "http://x"}], "source": "fake"})
 
-    async def research_skills(self, intent: str, **kwargs):
-        self.calls.append(("research_skills", intent, kwargs))
-        return HermesResult(ok=True, data={"skills": [{"id": "fake-skill", "prompt": "fake"}]})
+    async def research_fetch(self, url: str, **kwargs):
+        self.calls.append(("research_fetch", url, kwargs))
+        return HermesResult(ok=True, data={"content": "Fake page content", "url": url})
 
-    async def market_product(self, product_id: str, **kwargs):
-        self.calls.append(("market_product", product_id, kwargs))
-        return HermesResult(ok=True, data={"product_id": product_id, "price": 99.9, "commission_pct": 15})
+    async def market_analyze(self, topic: str, **kwargs):
+        self.calls.append(("market_analyze", topic, kwargs))
+        return HermesResult(ok=True, data={"report": "Fake market report", "topic": topic})
 
-    async def market_competitors(self, category_id: str, **kwargs):
-        self.calls.append(("market_competitors", category_id, kwargs))
-        return HermesResult(ok=True, data={"competitors": [{"id": "comp-1", "name": "Competitor"}]})
+    async def market_reports(self):
+        self.calls.append(("market_reports",))
+        return HermesResult(ok=True, data={"reports": [{"id": "market-fake-1", "topic": "Fake Topic", "status": "success"}]})
 
-    async def market_trends(self, **kwargs):
-        self.calls.append(("market_trends", kwargs))
-        return HermesResult(ok=True, data={"trends": [{"date": "2026-01-01", "gmv": 1000}]})
+    async def market_report(self, report_id: str):
+        self.calls.append(("market_report", report_id))
+        return HermesResult(ok=True, data={"html": "<html>Fake report</html>", "id": report_id})
 
     async def health(self):
         return {"research": {"ok": True, "status": 200}, "market": {"ok": True, "status": 200}}
@@ -406,35 +406,35 @@ def test_hermes_client_research_and_market(tmp_path):
     assert r.json()["research"]["ok"] is True
     assert r.json()["market"]["ok"] is True
 
-    # /hermes/research
+    # /hermes/research (GET with query params -> POST /api/research/search)
     r = c.get("/hermes/research", headers=headers, params={"q": "fone tws", "limit": 5})
     assert r.status_code == 200
     assert r.json()["data"]["results"][0]["title"] == "Fake result"
     assert fake.calls[-1][0] == "research"
 
-    # /hermes/research/skills
-    r = c.get("/hermes/research/skills", headers=headers, params={"intent": "campaign-decision", "limit": 3})
+    # /hermes/research/fetch
+    r = c.get("/hermes/research/fetch", headers=headers, params={"url": "http://example.com", "max_bytes": 1000})
     assert r.status_code == 200
-    assert r.json()["data"]["skills"][0]["id"] == "fake-skill"
-    assert fake.calls[-1][0] == "research_skills"
+    assert r.json()["data"]["url"] == "http://example.com"
+    assert fake.calls[-1][0] == "research_fetch"
 
-    # /hermes/market/product
-    r = c.get("/hermes/market/product", headers=headers, params={"product_id": "prod-123", "region": "BR"})
+    # /hermes/market/analyze (POST)
+    r = c.post("/hermes/market/analyze", headers=headers, json={"topic": "fone tws", "max_sources": 10})
     assert r.status_code == 200
-    assert r.json()["data"]["product_id"] == "prod-123"
-    assert fake.calls[-1][0] == "market_product"
+    assert r.json()["data"]["topic"] == "fone tws"
+    assert fake.calls[-1][0] == "market_analyze"
 
-    # /hermes/market/competitors
-    r = c.get("/hermes/market/competitors", headers=headers, params={"category_id": "cat-1", "limit": 5})
+    # /hermes/market/reports
+    r = c.get("/hermes/market/reports", headers=headers)
     assert r.status_code == 200
-    assert r.json()["data"]["competitors"][0]["id"] == "comp-1"
-    assert fake.calls[-1][0] == "market_competitors"
+    assert r.json()["data"]["reports"][0]["id"] == "market-fake-1"
+    assert fake.calls[-1][0] == "market_reports"
 
-    # /hermes/market/trends
-    r = c.get("/hermes/market/trends", headers=headers, params={"category_id": "cat-1", "days": 30})
+    # /hermes/market/report/{id}
+    r = c.get("/hermes/market/report/market-fake-1", headers=headers)
     assert r.status_code == 200
-    assert r.json()["data"]["trends"][0]["gmv"] == 1000
-    assert fake.calls[-1][0] == "market_trends"
+    assert r.json()["data"]["id"] == "market-fake-1"
+    assert fake.calls[-1][0] == "market_report"
 
 
 def test_hermes_unavailable_returns_503(tmp_path):

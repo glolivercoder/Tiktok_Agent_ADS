@@ -66,7 +66,7 @@ def create_app(
         timeout_s=cfg.hermes_timeout_s,
     )
 
-    app = FastAPI(title="hermes-echotik-agent", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
+    app = FastAPI(title="hermes-echotik-agent", version="0.1.0", docs_url="/docs", redoc_url="/redoc", openapi_url="/openapi.json", redirect_slashes=False)
     limiter = RateLimiter(cfg.rate_limit_per_min, cfg.rate_limit_burst)
     app.state.settings = cfg
     app.state.store = st
@@ -276,63 +276,53 @@ def create_app(
     async def hermes_research(
         q: str,
         limit: int = 10,
-        region: str = "BR",
-        language: str = "pt-BR",
+        providers: str | None = None,
+        trace_id: str | None = None,
+        allow_public: bool | None = None,
         _: None = Depends(require_token),
     ) -> dict:
-        result = await herm.research(q, limit=limit, region=region, language=language)
+        provider_list = providers.split(",") if providers else ["tavily", "serpapi", "brave", "linkup", "context7"]
+        result = await herm.research(q, limit=limit, providers=provider_list, trace_id=trace_id, allow_public=allow_public)
         if not result.ok:
             raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_RESEARCH_ERROR", "message": result.error})
         return {"ok": True, "data": result.data}
 
-    @app.get("/hermes/research/skills")
-    async def hermes_research_skills(
-        intent: str,
-        limit: int = 5,
+    @app.get("/hermes/research/fetch")
+    async def hermes_research_fetch(
+        url: str,
+        max_bytes: int = 50000,
         _: None = Depends(require_token),
     ) -> dict:
-        result = await herm.research_skills(intent, limit=limit)
+        result = await herm.research_fetch(url, max_bytes=max_bytes)
         if not result.ok:
-            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_RESEARCH_SKILLS_ERROR", "message": result.error})
+            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_RESEARCH_FETCH_ERROR", "message": result.error})
         return {"ok": True, "data": result.data}
 
-    @app.get("/hermes/market/product")
-    async def hermes_market_product(
-        product_id: str,
-        region: str = "BR",
+    @app.post("/hermes/market/analyze")
+    async def hermes_market_analyze(
+        body: dict,
         _: None = Depends(require_token),
     ) -> dict:
-        result = await herm.market_product(product_id, region=region)
-        if not result.ok:
-            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_MARKET_ERROR", "message": result.error})
-        return {"ok": True, "data": result.data}
-
-    @app.get("/hermes/market/competitors")
-    async def hermes_market_competitors(
-        category_id: str,
-        limit: int = 10,
-        region: str = "BR",
-        _: None = Depends(require_token),
-    ) -> dict:
-        result = await herm.market_competitors(category_id, limit=limit, region=region)
+        topic = body.get("topic", "")
+        max_sources = int(body.get("maxSources", 12))
+        fetch_top = int(body.get("fetchTop", 3))
+        trace_id = body.get("traceId")
+        project_id = body.get("projectId")
+        result = await herm.market_analyze(topic, project_id=project_id, trace_id=trace_id, max_sources=max_sources, fetch_top=fetch_top)
         if not result.ok:
             raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_MARKET_ERROR", "message": result.error})
         return {"ok": True, "data": result.data}
 
-    @app.get("/hermes/market/trends")
-    async def hermes_market_trends(
-        category_id: str | None = None,
-        subcategory_id: str | None = None,
-        days: int = 30,
-        region: str = "BR",
-        _: None = Depends(require_token),
-    ) -> dict:
-        result = await herm.market_trends(
-            category_id=category_id,
-            subcategory_id=subcategory_id,
-            days=days,
-            region=region,
-        )
+    @app.get("/hermes/market/reports")
+    async def hermes_market_reports(_: None = Depends(require_token)) -> dict:
+        result = await herm.market_reports()
+        if not result.ok:
+            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_MARKET_ERROR", "message": result.error})
+        return {"ok": True, "data": result.data}
+
+    @app.get("/hermes/market/report/{report_id}")
+    async def hermes_market_report(report_id: str, _: None = Depends(require_token)) -> dict:
+        result = await herm.market_report(report_id)
         if not result.ok:
             raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_MARKET_ERROR", "message": result.error})
         return {"ok": True, "data": result.data}
