@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from .config import Settings
 from .echotok import EchoTokClient, EchoTokError
 from .embedding import build_embedder
+from .hermes import HermesClient
 from .llm import LLMClient
 from .ratelimit import RateLimiter
 from .models import (
@@ -47,6 +48,7 @@ def create_app(
     rag: RAG | None = None,
     llm: object | None = None,
     echotok: object | None = None,
+    hermes: object | None = None,
 ) -> FastAPI:
     cfg = settings or __import__("echotik_agent.config", fromlist=["load_settings"]).load_settings()
     st = store or Store(cfg.sqlite_path)
@@ -57,6 +59,12 @@ def create_app(
         rg = rag
     client = llm if llm is not None else LLMClient(cfg)
     tok = echotok if echotok is not None else EchoTokClient(cfg)
+    herm = hermes if hermes is not None else HermesClient(
+        research_url=cfg.hermes_research_url,
+        market_url=cfg.hermes_market_url,
+        token=cfg.hermes_token,
+        timeout_s=cfg.hermes_timeout_s,
+    )
 
     app = FastAPI(title="hermes-echotik-agent", version="0.1.0", docs_url=None, redoc_url=None, openapi_url=None)
     limiter = RateLimiter(cfg.rate_limit_per_min, cfg.rate_limit_burst)
@@ -65,6 +73,7 @@ def create_app(
     app.state.rag = rg
     app.state.llm = client
     app.state.echotok = tok
+    app.state.hermes = herm
     app.state.rate_limiter = limiter
 
     @app.middleware("http")
@@ -257,6 +266,76 @@ def create_app(
                 remaining=max(0, limit - used),
             ),
         )
+
+    # ---------- Hermes (pesquisa/mercado) ----------
+    @app.get("/hermes/health")
+    async def hermes_health(_: None = Depends(require_token)) -> dict:
+        return await herm.health()
+
+    @app.get("/hermes/research")
+    async def hermes_research(
+        q: str,
+        limit: int = 10,
+        region: str = "BR",
+        language: str = "pt-BR",
+        _: None = Depends(require_token),
+    ) -> dict:
+        result = await herm.research(q, limit=limit, region=region, language=language)
+        if not result.ok:
+            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_RESEARCH_ERROR", "message": result.error})
+        return {"ok": True, "data": result.data}
+
+    @app.get("/hermes/research/skills")
+    async def hermes_research_skills(
+        intent: str,
+        limit: int = 5,
+        _: None = Depends(require_token),
+    ) -> dict:
+        result = await herm.research_skills(intent, limit=limit)
+        if not result.ok:
+            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_RESEARCH_SKILLS_ERROR", "message": result.error})
+        return {"ok": True, "data": result.data}
+
+    @app.get("/hermes/market/product")
+    async def hermes_market_product(
+        product_id: str,
+        region: str = "BR",
+        _: None = Depends(require_token),
+    ) -> dict:
+        result = await herm.market_product(product_id, region=region)
+        if not result.ok:
+            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_MARKET_ERROR", "message": result.error})
+        return {"ok": True, "data": result.data}
+
+    @app.get("/hermes/market/competitors")
+    async def hermes_market_competitors(
+        category_id: str,
+        limit: int = 10,
+        region: str = "BR",
+        _: None = Depends(require_token),
+    ) -> dict:
+        result = await herm.market_competitors(category_id, limit=limit, region=region)
+        if not result.ok:
+            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_MARKET_ERROR", "message": result.error})
+        return {"ok": True, "data": result.data}
+
+    @app.get("/hermes/market/trends")
+    async def hermes_market_trends(
+        category_id: str | None = None,
+        subcategory_id: str | None = None,
+        days: int = 30,
+        region: str = "BR",
+        _: None = Depends(require_token),
+    ) -> dict:
+        result = await herm.market_trends(
+            category_id=category_id,
+            subcategory_id=subcategory_id,
+            days=days,
+            region=region,
+        )
+        if not result.ok:
+            raise HTTPException(status_code=result.status or 502, detail={"error": "HERMES_MARKET_ERROR", "message": result.error})
+        return {"ok": True, "data": result.data}
 
     @app.post("/chat", response_model=ChatResponse)
     async def chat(body: ChatRequest, request: Request, _: None = Depends(require_token)) -> ChatResponse:

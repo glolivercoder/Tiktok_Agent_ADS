@@ -1,12 +1,14 @@
 import base64
 import json
 from dataclasses import replace
+from unittest.mock import AsyncMock
 
 from fastapi.testclient import TestClient
 
 from echotik_agent.config import Settings
 from echotik_agent.echotok import EchoTokClient, build_auth_header
 from echotik_agent.embedding import HashEmbedder, build_embedder
+from echotik_agent.hermes import HermesClient, HermesResult
 from echotik_agent.llm import LLMResult, NullLLM
 from echotik_agent.main import create_app
 from echotik_agent.skills import load_skills, select_skills
@@ -350,3 +352,104 @@ def test_echotok_basic_auth_accepts_user_pass_or_single_key(tmp_path):
     s3 = replace(settings(tmp_path), echotok_api_user="u", echotok_api_password="p")
     header3 = build_auth_header(s3)
     assert base64.b64decode(header3.split(" ", 1)[1]).decode() == "u:p"
+
+
+class FakeHermes(HermesClient):
+    available = True
+
+    def __init__(self) -> None:
+        super().__init__(research_url="http://fake", market_url="http://fake")
+        self.calls: list[tuple] = []
+
+    async def research(self, q: str, **kwargs):
+        self.calls.append(("research", q, kwargs))
+        return HermesResult(ok=True, data={"results": [{"title": "Fake result", "url": "http://x"}], "source": "fake"})
+
+    async def research_skills(self, intent: str, **kwargs):
+        self.calls.append(("research_skills", intent, kwargs))
+        return HermesResult(ok=True, data={"skills": [{"id": "fake-skill", "prompt": "fake"}]})
+
+    async def market_product(self, product_id: str, **kwargs):
+        self.calls.append(("market_product", product_id, kwargs))
+        return HermesResult(ok=True, data={"product_id": product_id, "price": 99.9, "commission_pct": 15})
+
+    async def market_competitors(self, category_id: str, **kwargs):
+        self.calls.append(("market_competitors", category_id, kwargs))
+        return HermesResult(ok=True, data={"competitors": [{"id": "comp-1", "name": "Competitor"}]})
+
+    async def market_trends(self, **kwargs):
+        self.calls.append(("market_trends", kwargs))
+        return HermesResult(ok=True, data={"trends": [{"date": "2026-01-01", "gmv": 1000}]})
+
+    async def health(self):
+        return {"research": {"ok": True, "status": 200}, "market": {"ok": True, "status": 200}}
+
+
+def test_hermes_client_research_and_market(tmp_path):
+    fake = FakeHermes()
+    s = settings(tmp_path)
+    c = TestClient(
+        create_app(
+            s,
+            Store(s.sqlite_path),
+            RAG(s.lancedb_path, dim=s.embedding_dim),
+            llm=NullLLM(),
+            echotok=FakeEchoTok(),
+            hermes=fake,
+        )
+    )
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+
+    # /hermes/health
+    r = c.get("/hermes/health", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["research"]["ok"] is True
+    assert r.json()["market"]["ok"] is True
+
+    # /hermes/research
+    r = c.get("/hermes/research", headers=headers, params={"q": "fone tws", "limit": 5})
+    assert r.status_code == 200
+    assert r.json()["data"]["results"][0]["title"] == "Fake result"
+    assert fake.calls[-1][0] == "research"
+
+    # /hermes/research/skills
+    r = c.get("/hermes/research/skills", headers=headers, params={"intent": "campaign-decision", "limit": 3})
+    assert r.status_code == 200
+    assert r.json()["data"]["skills"][0]["id"] == "fake-skill"
+    assert fake.calls[-1][0] == "research_skills"
+
+    # /hermes/market/product
+    r = c.get("/hermes/market/product", headers=headers, params={"product_id": "prod-123", "region": "BR"})
+    assert r.status_code == 200
+    assert r.json()["data"]["product_id"] == "prod-123"
+    assert fake.calls[-1][0] == "market_product"
+
+    # /hermes/market/competitors
+    r = c.get("/hermes/market/competitors", headers=headers, params={"category_id": "cat-1", "limit": 5})
+    assert r.status_code == 200
+    assert r.json()["data"]["competitors"][0]["id"] == "comp-1"
+    assert fake.calls[-1][0] == "market_competitors"
+
+    # /hermes/market/trends
+    r = c.get("/hermes/market/trends", headers=headers, params={"category_id": "cat-1", "days": 30})
+    assert r.status_code == 200
+    assert r.json()["data"]["trends"][0]["gmv"] == 1000
+    assert fake.calls[-1][0] == "market_trends"
+
+
+def test_hermes_unavailable_returns_503(tmp_path):
+    # Sem hermes fake, usa cliente real com URLs não configuradas
+    s = replace(settings(tmp_path), hermes_research_url="", hermes_market_url="")
+    c = TestClient(
+        create_app(
+            s,
+            Store(s.sqlite_path),
+            RAG(s.lancedb_path, dim=s.embedding_dim),
+            llm=NullLLM(),
+        )
+    )
+    headers = {"Authorization": f"Bearer {TOKEN}"}
+    r = c.get("/hermes/health", headers=headers)
+    assert r.status_code == 200
+    assert r.json()["research"]["ok"] is False
+    assert r.json()["market"]["ok"] is False
