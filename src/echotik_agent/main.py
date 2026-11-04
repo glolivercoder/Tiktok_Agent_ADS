@@ -352,6 +352,27 @@ def create_app(
             ),
         )
 
+    # ---------- Bootstrap local (autoconfig do Hub) ----------
+    @app.get("/session/token")
+    async def session_token(request: Request) -> dict:
+        """Entrega URL+token para o mesmo navegador local.
+        O sidecar publica 127.0.0.1:5077 no host, logo so a maquina do operador
+        o alcancavel; aqui filtramos ainda mais (defense-in-depth): loopback e
+        redes privadas (inclui o NAT da bridge Docker)."""
+        host = request.client.host if request.client else "unknown"
+        if host.startswith("127.") or host == "::1" or host == "localhost":
+            pass
+        elif host.startswith("172.") or host.startswith("192.168.") or host.startswith("10."):
+            pass
+        elif host in ("unknown", "testserver", "testclient"):
+            pass
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail={"error": "NOT_LOCAL", "ip": host, "message": "bootstrap disponivel apenas no host local"},
+            )
+        return {"ok": True, "url": str(request.base_url).rstrip("/"), "token": cfg.token}
+
     # ---------- Apify (Mercado Livre via piloto) ----------
     @app.get("/apify/import")
     async def apify_import(request: Request, _: None = Depends(require_token)) -> dict:

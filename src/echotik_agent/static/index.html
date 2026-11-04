@@ -3118,6 +3118,19 @@ restore();
 bindEvents();
 
 async function initRealData() {
+  /* Bootstrap: se o operador nunca configurou o sidecar neste navegador,
+     busca URL+token do proprio servidor (endpoint local-only /session/token). */
+  if (!sidecarReady()) {
+    try {
+      const rB = await fetch(window.location.origin + '/session/token');
+      const jB = await rB.json().catch(() => null);
+      if (rB.ok && jB && jB.ok && jB.token) {
+        state.config.sidecar = { url: String(jB.url || window.location.origin).replace(/\/+$/, ''), token: jB.token, on: true };
+        persist();
+        if (currentRoute === 'config') RENDER.config();
+      }
+    } catch (e) { /* sidecar desligado ou acesso remoto: mantem regras locais */ }
+  }
   if (!sidecarReady()) {
     addMsg('ai', 'Sou o agente desta sess\u00E3o. <strong>Dados simulados em uso.</strong> Configure o sidecar em Configura\u00E7\u00F5es \u2192 Agente sidecar (URL + token) para conectar dados reais da EchoTok.');
   }
@@ -3141,7 +3154,34 @@ async function initRealData() {
       if (currentRoute === 'nichos') RENDER.nichos();
       return;
     }
-  } catch (e) { /* apify indisponivel: segue para EchoTok */ }
+  } catch (e) {
+    /* falhou (sidecar trocado/token velho): força re-bootstrap e tenta de novo */
+    try {
+      const rB2 = await fetch(window.location.origin + '/session/token');
+      const jB2 = await rB2.json().catch(() => null);
+      if (rB2.ok && jB2 && jB2.ok && jB2.token) {
+        state.config.sidecar = { url: String(jB2.url || window.location.origin).replace(/\/+$/, ''), token: jB2.token, on: true };
+        persist();
+      }
+      const rAp2 = await sidecarFetch('/apify/import', { method: 'GET' }, 20000);
+      const jAp2 = await rAp2.json().catch(() => null);
+      if (rAp2.ok && jAp2 && Array.isArray(jAp2.products) && jAp2.products.length) {
+        const mapped2 = jAp2.products.map(apifyItemToProduct);
+        products.length = 0;
+        products.push(...mapped2);
+        recomputarProdutos();
+        state.fonte = 'apify';
+        state.selected = products[0].id;
+        state.categoria = '';
+        persist();
+        RENDER.dados();
+        if (currentRoute === 'visao') RENDER.visao();
+        if (currentRoute === 'produtos') RENDER.produtos();
+        if (currentRoute === 'nichos') RENDER.nichos();
+        return;
+      }
+    } catch (e2) { /* segue para EchoTok/simulado */ }
+  }
   try {
       const r = await sidecarFetch('/echotok/status', { method: 'GET' }, 8000);
       const j = await r.json().catch(() => null);
