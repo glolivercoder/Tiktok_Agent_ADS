@@ -72,22 +72,22 @@ a { color: inherit; text-decoration: none; }
 /* ---------- shell: trilho de ícones + canvas ---------- */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { margin: 0; background: var(--ground); color: var(--text); font: var(--fs-body)/20px var(--font); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
-.app { display: grid; grid-template-columns: var(--rail-width) minmax(0, 1fr); min-height: 100svh; }
+.app { display: grid; grid-template-columns: var(--rail-width) minmax(0, 1fr); min-height: 100svh; overflow: hidden; }
 .rail { position: sticky; top: 0; height: 100svh; display: flex; flex-direction: column; align-items: stretch; background: var(--ground); border-right: 1px solid var(--border); padding: 14px 0 18px; z-index: 30; overflow-y: auto; }
-.rail .mark { display: flex; align-items: center; justify-content: center; height: 44px; margin-bottom: 18px; color: var(--accent); }
-.rail .mark svg { width: 24px; height: 24px; }
-.rail-group { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+.rail .mark { display: flex; align-items: center; justify-content: center; height: 44px; margin-bottom: 18px; color: var(--accent); flex-shrink: 0; }
+.rail .mark svg { width: 24px; height: 24px; flex-shrink: 0; }
+.rail-group { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; flex-shrink: 0; }
 .rail-group::after { content: ""; display: block; height: 1px; width: 22px; margin: 12px auto 4px; background: var(--border); }
-.rail-item { position: relative; display: flex; align-items: center; justify-content: center; height: 40px; border-radius: 8px; color: var(--muted); transition: color var(--t-hover) ease, background-color var(--t-hover) ease; }
-.rail-item svg { width: 18px; height: 18px; stroke-width: 1.5; }
+.rail-item { position: relative; display: flex; align-items: center; justify-content: center; height: 40px; min-height: 40px; border-radius: 8px; color: var(--muted); transition: color var(--t-hover) ease, background-color var(--t-hover) ease; flex-shrink: 0; }
+.rail-item svg { width: 18px; height: 18px; stroke-width: 1.5; flex-shrink: 0; }
 .rail-item:hover { background: var(--raised); color: var(--text); }
 .rail-item[aria-current="page"] { color: var(--accent); background: transparent; }
 .rail-item[aria-current="page"]::after { content: ""; position: absolute; right: -9px; top: 6px; bottom: 6px; width: 1px; background: var(--accent); }
-.rail-bottom { margin-top: auto; padding: 0 8px; }
+.rail-bottom { margin-top: auto; padding: 0 8px; flex-shrink: 0; }
 .phonebar { display: none; }
 .sheet-nav { display: none; }
 
-.canvas { min-width: 0; padding: 28px var(--pad) 64px; }
+.canvas { min-width: 0; padding: 28px var(--pad) 64px; overflow-x: auto; }
 .view { display: none; }
 .view.on { display: block; }
 
@@ -3076,6 +3076,42 @@ console.log('[EchoHub] inicializado', {
   fontes_disponiveis: Object.keys(FONTE_LABEL),
   lado_cliente: true,
 });
+
+// Logs de diagnóstico de layout (para depurar sobreposição do rail/canvas)
+function logLayout() {
+  const app = $('.app');
+  const rail = $('.rail');
+  const canvas = $('.canvas');
+  if (!app || !rail || !canvas) return;
+  const cs = getComputedStyle(document.documentElement);
+  console.log('[EchoHub] layout-diagnose', {
+    railWidth: cs.getPropertyValue('--rail-width').trim(),
+    appDisplay: getComputedStyle(app).display,
+    appGridTemplate: getComputedStyle(app).gridTemplateColumns,
+    railPosition: getComputedStyle(rail).position,
+    railTop: getComputedStyle(rail).top,
+    railHeight: getComputedStyle(rail).height,
+    railOverflowY: getComputedStyle(rail).overflowY,
+    railRect: { top: rail.getBoundingClientRect().top, bottom: rail.getBoundingClientRect().bottom, height: rail.getBoundingClientRect().height },
+    canvasRect: { left: canvas.getBoundingClientRect().left, right: canvas.getBoundingClientRect().right, width: canvas.getBoundingClientRect().width },
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+  });
+  const items = $$('.rail-item');
+  items.forEach((it, i) => {
+    const r = it.getBoundingClientRect();
+    console.log(`[EchoHub] rail-item[${i}]`, {
+      top: Math.round(r.top),
+      bottom: Math.round(r.bottom),
+      height: Math.round(r.height),
+      flexShrink: getComputedStyle(it).flexShrink,
+    });
+  });
+}
+
+// Executa diagnóstico após renderização inicial
+setTimeout(logLayout, 500);
+window.addEventListener('resize', () => setTimeout(logLayout, 100));
 </script>
 </body>
 </html>
