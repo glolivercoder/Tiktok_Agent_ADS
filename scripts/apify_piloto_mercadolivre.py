@@ -26,6 +26,8 @@ from pathlib import Path
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+import argparse
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = PROJECT_ROOT / "data" / "market-reports" / "apify"
 RUN_DATE = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H%M")
@@ -58,6 +60,44 @@ def serpapi_trending(api_key: str, geo: str = "BR", n: int = 330) -> list[dict]:
     if "error" in data:
         raise RuntimeError(f"SerpApi: {data['error']}")
     return data.get("trending_searches", [])[:n]
+
+
+def serpapi_related(seed: str, api_key: str, geo: str = "BR") -> dict:
+    """RELATED_QUERIES no painel Froogle (Google Shopping): buscas reais de compra
+    relacionadas ao seed. Devolve {'top': [...], 'rising': [...]}."""
+    q = urllib.parse.urlencode(
+        {
+            "engine": "google_trends",
+            "data_type": "RELATED_QUERIES",
+            "q": seed,
+            "geo": geo,
+            "hl": "pt-br",
+            "gprop": "froogle",
+            "top": "true",
+            "api_key": api_key,
+        }
+    )
+    data = http_json(f"https://serpapi.com/search.json?{q}")
+    if "error" in data:
+        raise RuntimeError(f"SerpApi: {data['error']}")
+    return data.get("related_queries", {})
+
+
+def terms_from_seed(seed: str, related: dict, n: int) -> list[str]:
+    """Top primeiro (buscas de volume real), depois rising (picos). Sem noticia,
+    sem duplicar o proprio seed e sem repetir termo."""
+    vistos = {seed.lower()}
+    out: list[str] = []
+    for grupo in ("top", "rising"):
+        for t in related.get(grupo, []):
+            q = t.get("query", "").strip()
+            if not q or q.lower() in vistos or NEWS_WORDS.search(q):
+                continue
+            vistos.add(q.lower())
+            out.append(q)
+            if len(out) >= n:
+                return out
+    return out
 
 
 # Categorias do Trends que nao sao busca de produto
@@ -144,8 +184,17 @@ def summarize(items: list[dict]) -> dict:
 
 
 def main() -> int:
-    n_terms = int(sys.argv[1]) if len(sys.argv) > 1 else 5
-    max_items = int(sys.argv[2]) if len(sys.argv) > 2 else 20
+    ap = argparse.ArgumentParser(description="Piloto Apify -> Mercado Livre")
+    ap.add_argument("n_terms", nargs="?", type=int, default=5, help="modo trending: nº de termos (default 5)")
+    ap.add_argument("--max-items", type=int, default=20, help="itens por run (R5: 20)")
+    ap.add_argument(
+        "--seeds",
+        default="",
+        help="modo seeds: lista de termos de produto ex.: \"garrafa termica,ring light\"",
+    )
+    ap.add_argument("--per-seed", type=int, default=3, help="queries relacionadas por seed (modo seeds)")
+    args = ap.parse_args()
+    max_items = args.max_items
 
     serp_key = env("SERPAPI_API_KEY")
     api_token = env("APIFY_API_TOKEN")
@@ -156,22 +205,40 @@ def main() -> int:
 
     actor = actor.replace("/", "~", 1)
 
-    print("[1/4] SerpApi: termos em alta no BR...")
-    all_q = serpapi_trending(serp_key)
-    termos = product_terms(all_q, n_terms)
-    print(f"      {len(all_q)} termos -> {len(termos)} aptos a produto:")
-    for t in termos:
-        print(f"      - {t}")
-    if not termos:
-        print("nenhum termo apto hoje; nada a coletar")
-        return 0
+    coletas: list[tuple[str, str]] = []  # (termo_ml, seed)
+
+    if args.seeds.strip():
+        seeds = [s.strip() for s in args.seeds.split(",") if s.strip()]
+        print(f"[1/4] SerpApi: RELATED_QUERIES (Froogle) de {len(seeds)} seeds...")
+        for seed in seeds:
+            rel = serpapi_related(seed, serp_key)
+            termos = terms_from_seed(seed, rel, args.per_seed)
+            top_n = rel.get("top", [])
+            print(f"      seed '{seed}' -> {len(top_n)} top + {len(rel.get('rising', []))} rising -> {len(termos)} escolhidas:")
+            for t in termos:
+                print(f"      - {t}")
+            coletas.extend((t, seed) for t in termos)
+        if not coletas:
+            print("nenhuma query relacionada apta; nada a coletar")
+            return 0
+    else:
+        print("[1/4] SerpApi: termos em alta no BR (trending)...")
+        all_trends = serpapi_trending(serp_key)
+        termos = product_terms(all_trends, args.n_terms)
+        print(f"      {len(all_trends)} termos -> {len(termos)} aptos a produto:")
+        for t in termos:
+            print(f"      - {t}")
+        coletas = [(t, "trending") for t in termos]
+        if not coletas:
+            print("nenhum termo apto hoje; nada a coletar")
+            return 0
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     relatorio = []
 
-    for n, termo in enumerate(termos, 1):
+    for n, (termo, seed) in enumerate(coletas, 1):
         tag = re.sub(r"[^a-z0-9]+", "-", termo.lower()).strip("-")[:40]
-        print(f"[{n}/{len(termos)}] run piloto: '{termo}' (maxItems={max_items})...")
+        print(f"[{n}/{len(coletas)}] run piloto: '{termo}' (seed={seed}, maxItems={max_items})...")
         run = start_run(actor, api_token, {
             "searchQueries": [termo],
             "siteId": "MLB",
@@ -198,6 +265,7 @@ def main() -> int:
             json.dumps(
                 {
                     "termo": termo,
+                    "seed": seed,
                     "actor": actor,
                     "run_id": run["id"],
                     "dataset_id": run["defaultDatasetId"],
@@ -211,6 +279,7 @@ def main() -> int:
         )
         s = summarize(items)
         s["termo"] = termo
+        s["seed"] = seed
         s["raw"] = str(raw_path.relative_to(PROJECT_ROOT))
         relatorio.append(s)
         print(
