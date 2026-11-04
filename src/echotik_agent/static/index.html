@@ -847,9 +847,17 @@ td .actions { display: flex; gap: 8px; justify-content: flex-end; align-items: c
             <div class="segmented" id="segFonte" role="group" aria-label="Modo de alimentação">
               <button type="button" data-fonte="simulado" aria-pressed="true">Simulado</button>
               <button type="button" data-fonte="api" aria-pressed="false">EchoTok API</button>
+              <button type="button" data-fonte="apify" aria-pressed="false">Apify · ML</button>
               <button type="button" data-fonte="csv" aria-pressed="false">CSV importado</button>
             </div>
             <p class="hint" id="fonteHint"></p>
+          </div>
+          <div class="field">
+            <label>Catálogo Apify · Mercado Livre (dados reais)</label>
+            <p class="hint">O piloto <code>scripts/apify_piloto_mercadolivre.py</code> coleta com as regras do market-intel e grava em <code>data/market-reports/apify/</code>. O sidecar só normaliza e publica; preços em BRL, nota, loja oficial e proveniência (actor, run, dataset) por produto.</p>
+            <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+              <button class="btn primary" type="button" id="btnApifyImport">Importar catálogo Apify</button>
+            </div>
           </div>
           <div class="field">
             <label>Importação real via sidecar</label>
@@ -1488,7 +1496,7 @@ function restore() {
       products.length = 0;
       products.push(...raw.produtos);
       recomputarProdutos();
-      if (raw.fonte === 'api' || raw.fonte === 'csv' || raw.fonte === 'simulado') state.fonte = raw.fonte;
+      if (raw.fonte === 'api' || raw.fonte === 'csv' || raw.fonte === 'simulado' || raw.fonte === 'apify') state.fonte = raw.fonte;
     } else {
       // Fonte importada sem produtos salvos não é uma fonte válida.
       state.fonte = 'simulado';
@@ -1874,7 +1882,7 @@ const QUICK = [
   'Quais nichos s\u00E3o oceano azul neste m\u00EAs?',
   'Quando \u00E9 o pico de vendas do meu produto?',
 ];
-const FONTE_LABEL = { simulado: 'feed simulado', api: 'EchoTok Data API', csv: 'CSV importado' };
+const FONTE_LABEL = { simulado: 'feed simulado', api: 'EchoTok Data API', apify: 'Apify \u00B7 Mercado Livre BR', csv: 'CSV importado' };
 
 RENDER.agente = function renderAgente() {
   const p = sel();
@@ -2206,6 +2214,74 @@ async function echoTokStatus() {
   }
 }
 
+/* ---------- Apify · Mercado Livre: dados reais do piloto ---------- */
+function apifyItemToProduct(api) {
+  const price = Math.max(0, +api.price || 0);
+  const rating = +api.rating || 0;
+  const quality = rating ? (rating / 5) * 100 : 50;
+  const src = api.source || {};
+  return {
+    id: apiId(api.id || api.permalink),
+    nome: String(api.name || 'Produto Mercado Livre'),
+    categoria: String(api.category || 'Sem categoria'),
+    subnicho: String(api.category || 'Sem subnicho'),
+    preco: price,
+    unidades30: 0, // EchoTok sendo a fonte de volume; ML via Apify so traz preco/nota agora
+    comissaoPct: 0, // comissao fica no painel de afiliados; nao se inventa
+    temp: Math.round(55 * 0.7 + quality * 0.3), // momentum neutro (sem serie de vendas)
+    priorGmv: 0, // sem unidades; GMV fica como sem dado
+    sat: rating ? rating / 5 : 0.5,
+    stars: rating ? rating.toFixed(1).replace('.', ',') + ' de 5' : 'sem avalia\u00E7\u00E3o',
+    trust: {
+      prazo: 'sem dado',
+      disputas: 'sem dado',
+      rep: (api.officialStore ? 'loja oficial: ' : '') + (api.seller || 'sem dado'),
+    },
+    complaints: [['Sem dados de reclama\u00E7\u00F5es no piloto Apify', 100]],
+    sazonal: null,
+    vel: null,
+    hooks: [],
+    semSerie: true,
+    cover: api.coverUrl || null,
+    growth7: null,
+    origem: { fonte: 'apify', actor: src.actor, runId: src.runId, datasetId: src.datasetId, scrapedAt: src.scrapedAt, permalink: api.permalink, desconto: api.discountPercent, precioOriginal: api.originalPrice },
+  };
+}
+
+async function importApify() {
+  if (!sidecarReady()) {
+    $('#testResult').innerHTML = noticeHTML('warn', 'Configure o sidecar em <strong>Configura\u00E7\u00F5es \u2192 Agente sidecar</strong> (URL + token) antes de importar.');
+    return;
+  }
+  $('#testResult').innerHTML = noticeHTML('neutral', 'Lendo o cat\u00E1logo Apify (Mercado Livre) no sidecar\u2026');
+  try {
+    const r = await sidecarFetch('/apify/import', { method: 'GET' }, 30000);
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(sidecarErrorDetail(j, r.status));
+    const list = Array.isArray(j && j.products) ? j.products : [];
+    if (!list.length) throw new Error('sem produtos no cat\u00E1logo Apify');
+
+    const mapped = list.map(apifyItemToProduct);
+    products.length = 0;
+    products.push(...mapped);
+    recomputarProdutos();
+    state.fonte = 'apify';
+    state.selected = products[0].id;
+    state.categoria = '';
+    persist();
+    const nColetas = (j.coletas || []).length;
+    $('#testResult').innerHTML = noticeHTML('pos', `${mapped.length} produtos reais (Apify \u00B7 Mercado Livre BR) de ${nColetas} coletas. Pre\u00E7os em BRL com proveni\u00EAncia por produto. Dados simulados substitu\u00EDdos.`);
+    toast(`Apify/ML: ${mapped.length} produtos importados.`);
+    RENDER.dados();
+    if (currentRoute === 'visao') RENDER.visao();
+    if (currentRoute === 'produtos') RENDER.produtos();
+    if (currentRoute === 'nichos') RENDER.nichos();
+  } catch (e) {
+    const why = e.name === 'AbortError' ? 'tempo esgotado (30s)' : /fetch|network|load/i.test(e.message || '') ? 'rede/CORS ou sidecar desligado' : (e.message || 'erro');
+    $('#testResult').innerHTML = noticeHTML('warn', '<strong>Importa\u00E7\u00E3o Apify falhou:</strong> ' + esc(why) + '. Rode o piloto: <code>python scripts/apify_piloto_mercadolivre.py --queries "..."</code>.');
+  }
+}
+
 let agentBusy = false;
 async function runAgent(q) {
   if (!q) return;
@@ -2253,8 +2329,9 @@ async function runAgent(q) {
 RENDER.dados = function renderDados() {
   $$('#segFonte button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fonte === state.fonte)));
   $('#fonteHint').textContent = {
-    simulado: 'Alimentando com dados simulados locais. Troque para API ou CSV quando quiser n\u00FAmeros reais.',
+    simulado: 'Alimentando com dados simulados locais. Troque para API, Apify ou CSV quando quiser n\u00FAmeros reais.',
     api: 'Modo API: a importa\u00E7\u00E3o usa o sidecar e a chave EchoTok fica no .env do servidor. O navegador nunca recebe essa chave.',
+    apify: 'Modo Apify: produtos e pre\u00E7os reais do Mercado Livre coletados pelo piloto (actor + run no campo origem de cada item). Unidades/comiss\u00E3o continuam do feed EchoTok.',
     csv: 'Alimentando com o CSV importado e salvo neste navegador; use Restaurar para voltar ao feed simulado.',
   }[state.fonte];
   $('#tblPlanos tbody').innerHTML = PLANOSECHOTOK.map(([nome, preco, lim]) =>
@@ -2540,6 +2617,7 @@ function bindEvents() {
   /* dados e APIs */
   $$('#segFonte button').forEach((b) => b.addEventListener('click', () => { state.fonte = b.dataset.fonte; RENDER.dados(); }));
   $('#btnEchoImport').addEventListener('click', importEchoTok);
+  $('#btnApifyImport').addEventListener('click', importApify);
   $('#btnEchoStatus').addEventListener('click', echoTokStatus);
   $('#calcChamadas').addEventListener('input', calcUpdate);
   $('#calcPreco').addEventListener('input', calcUpdate);

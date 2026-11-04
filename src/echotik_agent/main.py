@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 import pytz
 
 from .config import Settings
+from . import apify_ml
 from .echotok import EchoTokClient, EchoTokError
 from .embedding import build_embedder
 from .hermes import HermesClient
@@ -350,6 +351,22 @@ def create_app(
                 remaining=max(0, limit - used),
             ),
         )
+
+    # ---------- Apify (Mercado Livre via piloto) ----------
+    @app.get("/apify/import")
+    async def apify_import(request: Request, _: None = Depends(require_token)) -> dict:
+        data = apify_ml.collect(cfg.data_dir)
+        if not data.get("ok"):
+            raise HTTPException(
+                status_code=404,
+                detail={"error": data.get("error", "APIFY_EMPTY"), "message": data.get("message", "sem coletas")},
+            )
+        audit_request(
+            request,
+            "apify_import",
+            {"count": data.get("count", 0), "coletas": len(data.get("coletas", []))},
+        )
+        return data
 
     # ---------- Hermes (pesquisa/mercado) ----------
     @app.get("/hermes/health")
