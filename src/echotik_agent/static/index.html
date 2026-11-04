@@ -3120,8 +3120,29 @@ bindEvents();
 async function initRealData() {
   if (!sidecarReady()) {
     addMsg('ai', 'Sou o agente desta sess\u00E3o. <strong>Dados simulados em uso.</strong> Configure o sidecar em Configura\u00E7\u00F5es \u2192 Agente sidecar (URL + token) para conectar dados reais da EchoTok.');
-  } else {
-    try {
+  }
+  /* Apify primeiro: catalogo real ja coletado pelo piloto; EchoTok fica de fallback. */
+  try {
+    const rAp = await sidecarFetch('/apify/import', { method: 'GET' }, 20000);
+    const jAp = await rAp.json().catch(() => null);
+    if (rAp.ok && jAp && Array.isArray(jAp.products) && jAp.products.length) {
+      const mapped = jAp.products.map(apifyItemToProduct);
+      products.length = 0;
+      products.push(...mapped);
+      recomputarProdutos();
+      state.fonte = 'apify';
+      state.selected = products[0].id;
+      state.categoria = '';
+      persist();
+      RENDER.dados();
+      addMsg('ai', 'Catalogo real <strong>Apify · Mercado Livre BR</strong> carregado no arranque: <strong>' + mapped.length + '</strong> produtos de ' + (jAp.coletas || []).length + ' coletas (preço BRL, nota, loja oficial e desconto). Unidades e comissão ficam "sem dado" até a EchoTok voltar.');
+      if (currentRoute === 'visao') RENDER.visao();
+      if (currentRoute === 'produtos') RENDER.produtos();
+      if (currentRoute === 'nichos') RENDER.nichos();
+      return;
+    }
+  } catch (e) { /* apify indisponivel: segue para EchoTok */ }
+  try {
       const r = await sidecarFetch('/echotok/status', { method: 'GET' }, 8000);
       const j = await r.json().catch(() => null);
       if (r.ok && j && j.configured) {
@@ -3135,7 +3156,6 @@ async function initRealData() {
     } catch (e) {
       addMsg('ai', '<strong>Aten\u00e7\u00e7\u00e3o:</strong> Dados simulados em uso. N\u00e3o foi poss\u00edvel verificar o status da EchoTok Data API.');
     }
-  }
 }
 
 initRealData().then(() => {
